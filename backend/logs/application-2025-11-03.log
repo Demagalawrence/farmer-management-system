@@ -1,0 +1,8 @@
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-03 17:06:37"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-03 17:06:37"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-03 17:06:37"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-03 17:06:37"}
+{"level":"info","message":"User logged in: far@gmail.com","timestamp":"2025-11-03 17:07:01"}
+{"level":"info","message":"User logged in: fin@gmail.com","timestamp":"2025-11-03 17:07:55"}
+{"ip":"::1","level":"error","message":"Invalid email or password","method":"POST","stack":"Error: Invalid email or password\n    at C:\\Users\\MEDISOFT\\Desktop\\Farmer Management  System\\backend\\src\\controllers\\authController.ts:22:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-11-03 17:08:30","url":"/api/auth/login"}
+{"level":"info","message":"User logged in: mag@gmial.com","timestamp":"2025-11-03 17:08:40"}
