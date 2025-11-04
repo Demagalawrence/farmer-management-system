@@ -1,0 +1,9 @@
+export { default as Dashboard } from './Dashboard';
+export { default as FarmerDashboard } from './FarmerDashboardNew';
+export { default as FieldOfficerDashboard } from './FieldOfficerDashboardNew';
+export { default as ManagerDashboard } from './ManagerDashboardNew';
+export { default as FinancialManagerDashboard } from './FinancialManagerDashboardNew';
+export { default as WallpaperGallery } from './WallpaperGallery';
+export { default as AuthPage } from './AuthPage';
+export { default as Login } from './Login';
+export { default as Register } from './Register';

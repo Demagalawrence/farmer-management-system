@@ -1,0 +1,19 @@
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-04 11:36:25"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-04 11:36:25"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-04 11:36:25"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-04 11:36:25"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-04 11:38:51"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-04 11:38:51"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-04 11:38:51"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-04 11:38:51"}
+{"ip":"::1","level":"error","message":"Invalid email or password","method":"POST","stack":"Error: Invalid email or password\n    at C:\\Users\\MEDISOFT\\Desktop\\Farmer Management  System\\backend\\src\\controllers\\authController.ts:22:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-11-04 11:39:37","url":"/api/auth/login"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-04 11:40:17"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-04 11:40:17"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-04 11:40:17"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-04 11:40:17"}
+{"ip":"::1","level":"error","message":"User with this email already exists","method":"POST","stack":"Error: User with this email already exists\n    at C:\\Users\\MEDISOFT\\Desktop\\Farmer Management  System\\backend\\src\\controllers\\authController.ts:71:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-11-04 11:40:48","url":"/api/auth/register"}
+{"ip":"::1","level":"error","message":"Invalid email or password","method":"POST","stack":"Error: Invalid email or password\n    at C:\\Users\\MEDISOFT\\Desktop\\Farmer Management  System\\backend\\src\\controllers\\authController.ts:22:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-11-04 11:42:11","url":"/api/auth/login"}
+{"level":"info","message":"New user registered: buayism@gmail.com","timestamp":"2025-11-04 11:42:42"}
+{"level":"info","message":"New user registered: dog@gmail.com","timestamp":"2025-11-04 11:45:56"}
+{"level":"info","message":"New user registered: finance1@gmail.com","timestamp":"2025-11-04 11:53:50"}
+{"level":"info","message":"User logged in: buayism@gmail.com","timestamp":"2025-11-04 12:00:35"}

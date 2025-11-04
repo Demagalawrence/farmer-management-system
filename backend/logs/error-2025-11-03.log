@@ -1,0 +1,1 @@
+{"ip":"::1","level":"error","message":"Invalid email or password","method":"POST","stack":"Error: Invalid email or password\n    at C:\\Users\\MEDISOFT\\Desktop\\Farmer Management  System\\backend\\src\\controllers\\authController.ts:22:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-11-03 17:08:30","url":"/api/auth/login"}

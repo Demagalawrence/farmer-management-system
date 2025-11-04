@@ -1,0 +1,23 @@
+import { ObjectId } from 'mongodb';
+export interface Payment {
+    _id?: ObjectId;
+    farmer_id: ObjectId;
+    harvest_id: ObjectId;
+    amount: number;
+    rate_per_ton: number;
+    status: 'pending' | 'approved' | 'paid' | 'rejected';
+    processed_by?: ObjectId;
+    payment_date?: Date;
+    created_at: Date;
+}
+export interface PaymentInput {
+    farmer_id: ObjectId;
+    harvest_id: ObjectId;
+    amount: number;
+    rate_per_ton: number;
+    status?: 'pending' | 'approved' | 'paid' | 'rejected';
+    processed_by?: ObjectId;
+    payment_date?: Date;
+    created_at?: Date;
+}
+//# sourceMappingURL=Payment.d.ts.map
