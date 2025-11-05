@@ -5,12 +5,12 @@ import { useWallpaper } from '../contexts/WallpaperContext';
 import { useAuth } from '../contexts/AuthContext';
 import WallpaperGallery from './WallpaperGallery';
 import { farmerService } from '../services/farmerService';
-import { userService } from '../services/userService';
 import { fieldService } from '../services/fieldService';
 import { harvestService } from '../services/harvestService';
 import { reportService } from '../services/reportService';
 import { paymentService } from '../services/paymentService';
 import FieldGoogleMap from './FieldGoogleMap';
+import AddLocationModal from './AddLocationModal';
 
 const FieldOfficerDashboard: React.FC = () => {
   // Add premium CSS animations
@@ -235,10 +235,10 @@ const FieldOfficerDashboard: React.FC = () => {
   const [showWallpaperGallery, setShowWallpaperGallery] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [showRegisterModal, setShowRegisterModal] = useState(false);
+  const [showLocationModal, setShowLocationModal] = useState(false);
   const [registerForm, setRegisterForm] = useState({
     name: '',
     email: '',
-    password: '',
     phone: '',
     address: '',
     farm_size: '',
@@ -418,38 +418,46 @@ const FieldOfficerDashboard: React.FC = () => {
     setShowWallpaperGallery(false);
   };
 
+  const handleAddLocation = async (locationData: any) => {
+    // Save location to a farmer record or update existing farmer with coordinates
+    // If farmer_id is provided, update that farmer; otherwise create a new location entry
+    try {
+      if (locationData.farmer_id && /^\d+$/.test(locationData.farmer_id)) {
+        // Update existing farmer with coordinates
+        const farmers = await farmerService.getAllFarmers();
+        const farmersArray = Array.isArray(farmers) ? farmers : (farmers?.data || []);
+        const farmer = farmersArray.find((f: any) => f.external_id === parseInt(locationData.farmer_id));
+        
+        if (farmer && farmer._id) {
+          await farmerService.updateFarmer(farmer._id, {
+            coordinates: locationData.coordinates
+          });
+        }
+      }
+      
+      // Refresh farmers list to show updated locations on map
+      const fms = await farmerService.getAllFarmers();
+      const fmArr = Array.isArray(fms) ? fms : (fms?.items || fms?.data || fms?.farmers || []);
+      setFarmers(fmArr);
+      
+      setActionMessage('✅ Farm location added successfully!');
+      setTimeout(() => setActionMessage(''), 3000);
+    } catch (error: any) {
+      setActionError(error?.response?.data?.message || error?.message || 'Failed to add location');
+      setTimeout(() => setActionError(''), 3000);
+    }
+  };
+
   const handleRegisterFarmer = async (e: React.FormEvent) => {
     e.preventDefault();
     setRegisterError('');
     setRegisterSuccess('');
 
     try {
-      // First, register the farmer as a user
-      const userResponse = await fetch('http://localhost:5000/api/auth/register', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${localStorage.getItem('token')}`
-        },
-        body: JSON.stringify({
-          name: registerForm.name,
-          email: registerForm.email,
-          password: registerForm.password,
-          role: 'farmer'
-        })
-      });
-
-      const userData = await userResponse.json();
-
-      if (!userResponse.ok) {
-        setRegisterError(userData.message || 'Failed to create user account');
-        return;
-      }
-
-      // Then create the farmer profile
+      // Create farmer directly as an entity (no user account)
       const farmerData: any = {
         name: registerForm.name,
-        user_id: userData.userId,
+        email: registerForm.email,
         phone: registerForm.phone,
         address: registerForm.address,
         farm_size: parseFloat(registerForm.farm_size),
@@ -471,7 +479,6 @@ const FieldOfficerDashboard: React.FC = () => {
       setRegisterForm({
         name: '',
         email: '',
-        password: '',
         phone: '',
         address: '',
         farm_size: '',
@@ -484,20 +491,6 @@ const FieldOfficerDashboard: React.FC = () => {
         setRegisterSuccess('');
       }, 2000);
     } catch (error: any) {
-      // If user was created but farmer creation failed, rollback user
-      try {
-        // Attempt to extract userId from last auth register if available in DOM fetch response
-        // We can't directly tap the previous response here, so try to find by email
-        if (registerForm.email) {
-          const existing = await userService.getUserByEmail(registerForm.email);
-          const uid = (existing?.data?._id) || existing?._id || existing?.id;
-          if (uid) {
-            await userService.deleteUser(uid);
-          }
-        }
-      } catch (_e) {
-        // swallow rollback errors
-      }
       // Show precise backend message if present
       const msg = error?.response?.data?.message || error?.message || 'Failed to register farmer';
       setRegisterError(msg);
@@ -593,7 +586,10 @@ const FieldOfficerDashboard: React.FC = () => {
                 <span className="text-sm">🌱</span>
                 <span>Add Crops</span>
               </button>
-              <button className="w-full flex items-center space-x-3 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
+              <button 
+                onClick={() => setShowLocationModal(true)}
+                className="w-full flex items-center space-x-3 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+              >
                 <MapPin className="w-4 h-4" />
                 <span>Add Location</span>
               </button>
@@ -1041,21 +1037,6 @@ const FieldOfficerDashboard: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Password *
-                </label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={registerForm.password}
-                  onChange={(e) => setRegisterForm({ ...registerForm, password: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="Min. 8 characters"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
                   Phone Number *
                 </label>
                 <input
@@ -1246,6 +1227,13 @@ const FieldOfficerDashboard: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Add Location Modal */}
+      <AddLocationModal
+        show={showLocationModal}
+        onClose={() => setShowLocationModal(false)}
+        onSuccess={handleAddLocation}
+      />
     </div>
   );
 };
