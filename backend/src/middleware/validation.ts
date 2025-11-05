@@ -34,10 +34,17 @@ export const schemas = {
   // Farmer schemas
   createFarmer: Joi.object({
     external_id: Joi.number().integer().positive().optional(),
-    user_id: Joi.string().required(),
-    phone: Joi.string().pattern(/^[0-9]{10,15}$/).required(),
-    address: Joi.string().min(5).max(500).required(),
-    farm_size: Joi.number().positive().required(),
+    user_id: Joi.string().optional(),
+    name: Joi.string().min(2).max(100).required(),
+    email: Joi.string().email().optional(),
+    phone: Joi.string().pattern(/^[0-9]{10,15}$/).optional(),
+    contact: Joi.string().optional(),
+    address: Joi.string().min(5).max(500).optional(),
+    farm_size: Joi.number().positive().optional(),
+    coordinates: Joi.object({
+      lat: Joi.number().min(-90).max(90).required(),
+      lng: Joi.number().min(-180).max(180).required()
+    }).optional(),
     status: Joi.string().valid('active', 'inactive', 'pending').default('active'),
   }),
 
@@ -46,6 +53,10 @@ export const schemas = {
     phone: Joi.string().pattern(/^[0-9]{10,15}$/).optional(),
     address: Joi.string().min(5).max(500).optional(),
     farm_size: Joi.number().positive().optional(),
+    coordinates: Joi.object({
+      lat: Joi.number().min(-90).max(90).required(),
+      lng: Joi.number().min(-180).max(180).required()
+    }).optional(),
     status: Joi.string().valid('active', 'inactive', 'pending').optional(),
   }).min(1),
 
