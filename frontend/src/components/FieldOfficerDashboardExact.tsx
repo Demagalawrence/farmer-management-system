@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Search, MapPin, Edit, UserPlus, X } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { MapPin, UserPlus, X } from 'lucide-react';
 import { useWallpaper } from '../contexts/WallpaperContext';
 import { useAuth } from '../contexts/AuthContext';
 import WallpaperGallery from './WallpaperGallery';
@@ -241,7 +241,6 @@ const FieldOfficerDashboard: React.FC = () => {
   const { currentWallpaper, setWallpaper } = useWallpaper();
   const { logout, user } = useAuth();
   const [showWallpaperGallery, setShowWallpaperGallery] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
   const [registerForm, setRegisterForm] = useState({
@@ -278,8 +277,8 @@ const FieldOfficerDashboard: React.FC = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
-  // Crops overview tab (category | health)
-  const [overviewTab, setOverviewTab] = useState<'category' | 'health'>('category');
+  
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   // Forms
   const [fieldForm, setFieldForm] = useState({
@@ -301,54 +300,23 @@ const FieldOfficerDashboard: React.FC = () => {
     date_range_end: '',
     notes: ''
   });
-  const [paymentForm, setPaymentForm] = useState({
-    farmer_id: '',
-    amount: '',
-    purpose: ''
-  });
-  const [actionMessage, setActionMessage] = useState('');
-  const [actionError, setActionError] = useState('');
-
-  // Derived: Crops overview data from actual records
-  const categoryData = React.useMemo(() => {
-    const sums: Record<string, number> = {};
-    const norm = (s: string) => (s || '').toLowerCase();
-    const toCategory = (crop: string): 'Fruits' | 'Vegetables' | 'Grains' | 'Other' => {
-      const c = norm(crop);
-      if (/wheat|barley|rice|corn|maize|oats|millet|grain/.test(c)) return 'Grains';
-      if (/vegetable|tomato|onion|cabbage|carrot|potato|beans|pea|spinach/.test(c)) return 'Vegetables';
-      if (c) return 'Fruits';
-      return 'Other';
-    };
+  // Derived: Monthly harvest quantities (auto, current year)
+  const monthlyBarData = React.useMemo(() => {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const sums: Record<string, number> = Object.fromEntries(months.map(m => [m, 0]));
+    const now = new Date();
+    const year = now.getFullYear();
     (harvests || []).forEach((h: any) => {
-      const cat = toCategory(h.crop_type || '');
-      const qty = Number(h.quantity_tons || 0);
-      sums[cat] = (sums[cat] || 0) + qty;
+      const d = new Date(h.harvest_date || h.harvestDate || h.date);
+      if (isNaN(d.getTime()) || d.getFullYear() !== year) return;
+      const m = months[d.getMonth()];
+      const qty = Number(h.quantity_tons ?? h.quantityTons ?? h.quantity ?? 0);
+      sums[m] += isNaN(qty) ? 0 : qty;
     });
-    const res = [
-      { name: 'Fruits', value: sums['Fruits'] || 0, color: '#FFA500' },
-      { name: 'Vegetables', value: sums['Vegetables'] || 0, color: '#90EE90' },
-      { name: 'Grains', value: sums['Grains'] || 0, color: '#228B22' },
-    ];
-    // If all zero and no data, keep empty to avoid misleading chart
-    return res.some(d => d.value > 0) ? res : res;
+    return months.map(m => ({ month: m, tons: sums[m] }));
   }, [harvests]);
 
-  const healthData = React.useMemo(() => {
-    const counts: Record<string, number> = { healthy: 0, needs_attention: 0, critical: 0 };
-    (fields || []).forEach((f: any) => {
-      const h = (f.health_status || '').toLowerCase();
-      if (h === 'healthy') counts.healthy += 1;
-      else if (h === 'needs_attention') counts.needs_attention += 1;
-      else if (h === 'critical') counts.critical += 1;
-    });
-    const res = [
-      { name: 'Healthy', value: counts.healthy, color: '#22c55e' },
-      { name: 'Needs Attention', value: counts.needs_attention, color: '#f59e0b' },
-      { name: 'Critical', value: counts.critical, color: '#ef4444' },
-    ];
-    return res;
-  }, [fields]);
+  
 
   // Fetch data and compute derived stats
   React.useEffect(() => {
@@ -566,19 +534,9 @@ const FieldOfficerDashboard: React.FC = () => {
                 <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
                   <span className="text-white font-bold text-sm">🌾</span>
                 </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Farmer ID (optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g., 1"
-                  value={registerForm.external_id}
-                  onChange={(e)=>setRegisterForm({...registerForm, external_id: e.target.value})}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">Leave blank to auto-assign the next ID.</p>
-              </div>
+
+      {/* Removed hover zone */}
+
                 <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
                 <span className="text-sm text-gray-500">System</span>
               </div>
@@ -628,26 +586,24 @@ const FieldOfficerDashboard: React.FC = () => {
         {/* EXACT Layout from your image */}
         <div className="flex gap-6">
           {/* Premium Sidebar */}
-          <div className="w-64 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 relative z-10">
-            <nav className="space-y-2">
+          <div
+            className={`w-80 overflow-hidden bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 relative z-10 transition-all duration-300`}
+          >
+            <nav className="space-y-[45px]">
               <div className="flex items-center space-x-3 bg-green-100 text-green-700 px-3 py-2 rounded-lg">
                 <span className="text-sm">📊</span>
-                <span className="font-medium">Dashboard</span>
+                {isSidebarExpanded && <span className="font-medium">Dashboard</span>}
               </div>
-              <button className="w-full flex items-center space-x-3 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-                <span className="text-sm">🌱</span>
-                <span>Add Crops</span>
-              </button>
               <button 
                 onClick={() => setShowLocationModal(true)}
-                className="w-full flex items-center space-x-3 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center space-x-3 text-gray-600 px-5 py-4 rounded-xl hover:bg-gray-50 transition-colors text-base font-semibold"
               >
                 <MapPin className="w-4 h-4" />
-                <span>Add Location</span>
+                {isSidebarExpanded && <span>Add Location</span>}
               </button>
               <button 
                 onClick={() => setShowRegisterModal(true)}
-                className="w-full flex items-center space-x-3 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full flex items-center space-x-3 bg-blue-500 hover:bg-blue-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <UserPlus className="w-4 h-4" />
                 <span className="font-medium">Register Farmer</span>
@@ -655,28 +611,28 @@ const FieldOfficerDashboard: React.FC = () => {
               {/* New Actions */}
               <button 
                 onClick={() => setShowFieldModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full mt-2 flex items-center space-x-3 bg-green-500 hover:bg-green-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <span className="text-sm">📍</span>
                 <span className="font-medium">Record Field Data</span>
               </button>
               <button 
                 onClick={() => setShowHarvestModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full mt-2 flex items-center space-x-3 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <span className="text-sm">🌾</span>
                 <span className="font-medium">Record Crop Data</span>
               </button>
               <button 
                 onClick={() => setShowReportModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full mt-2 flex items-center space-x-3 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <span className="text-sm">📄</span>
                 <span className="font-medium">Generate Report</span>
               </button>
               <button 
                 onClick={() => setShowPaymentModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full mt-2 flex items-center space-x-3 bg-purple-500 hover:bg-purple-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <span className="text-sm">💳</span>
                 <span className="font-medium">Request Payment</span>
@@ -686,19 +642,7 @@ const FieldOfficerDashboard: React.FC = () => {
 
           {/* Main Content - EXACT Layout */}
           <div className="flex-1 space-y-6">
-            {/* Premium Search Bar */}
-            <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 relative z-10">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search crop here"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-              </div>
-            </div>
+            
 
             {/* Farm Locations (Google Map) */}
             <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
@@ -710,58 +654,7 @@ const FieldOfficerDashboard: React.FC = () => {
               <p className="mt-2 text-xs text-gray-500">Tip: Set VITE_GOOGLE_MAPS_API_KEY in frontend .env to enable Google Maps tiles. Without it, a fallback message will display.</p>
             </div>
 
-            {/* Crops Overview */}
-            <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Crops Overview</h2>
-                <div className="flex items-center bg-gray-100 rounded-lg text-xs">
-                  <button
-                    className={`px-3 py-1 rounded-l-lg ${overviewTab==='category' ? 'bg-white shadow font-medium' : 'text-gray-600'}`}
-                    onClick={() => setOverviewTab('category')}
-                  >By Category</button>
-                  <button
-                    className={`px-3 py-1 rounded-r-lg ${overviewTab==='health' ? 'bg-white shadow font-medium' : 'text-gray-600'}`}
-                    onClick={() => setOverviewTab('health')}
-                  >By Health</button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={overviewTab==='category' ? categoryData : healthData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        dataKey="value"
-                      >
-                        {(overviewTab==='category' ? categoryData : healthData).map((entry:any, index:number) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-3">
-                  {(overviewTab==='category' ? categoryData : healthData).map((item:any, idx:number) => (
-                    <div key={idx} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-sm font-medium">{item.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-gray-900">{Number(item.value).toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">{overviewTab==='category' ? 'tons' : 'fields'}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            
 
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -824,38 +717,55 @@ const FieldOfficerDashboard: React.FC = () => {
               {/* Recent Activities */}
               <div className="lg:col-span-2 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
                 <h2 className="text-xl font-semibold mb-4">Recent Activities</h2>
-                <div className="space-y-3">
-                  {[
-                    ...farmers.map((f:any)=>({
-                      ts: f.registration_date ? new Date(f.registration_date).getTime() : 0,
-                      label: `Registered farmer: ${f.name ?? '—'}`,
-                      tag: 'farmer'
-                    })),
-                    ...fields.map((fl:any)=>({
-                      ts: fl.created_at ? new Date(fl.created_at).getTime() : 0,
-                      label: `New field at ${fl.location ?? '—'}`,
-                      tag: 'field'
-                    })),
-                    ...harvests.map((h:any)=>({
-                      ts: h.harvest_date ? new Date(h.harvest_date).getTime() : 0,
-                      label: `Harvest recorded: ${h.quantity_tons ?? 0} tons`,
-                      tag: 'harvest'
-                    })),
-                    ...reports.map((r:any)=>({
-                      ts: r.created_at ? new Date(r.created_at).getTime() : 0,
-                      label: `Report generated: ${r.type}`,
-                      tag: 'report'
-                    })),
-                  ]
-                  .filter(a=>a.ts>0)
-                  .sort((a,b)=>b.ts-a.ts)
-                  .slice(0,6)
-                  .map((a,idx)=> (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-800">{a.label}</div>
-                      <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-700">{a.tag}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    {[
+                      ...farmers.map((f:any)=>({
+                        ts: f.registration_date ? new Date(f.registration_date).getTime() : 0,
+                        label: `Registered farmer: ${f.name ?? '—'}`,
+                        tag: 'farmer'
+                      })),
+                      ...fields.map((fl:any)=>({
+                        ts: fl.created_at ? new Date(fl.created_at).getTime() : 0,
+                        label: `New field at ${fl.location ?? '—'}`,
+                        tag: 'field'
+                      })),
+                      ...harvests.map((h:any)=>({
+                        ts: h.harvest_date ? new Date(h.harvest_date).getTime() : 0,
+                        label: `Harvest recorded: ${h.quantity_tons ?? 0} tons`,
+                        tag: 'harvest'
+                      })),
+                      ...reports.map((r:any)=>({
+                        ts: r.created_at ? new Date(r.created_at).getTime() : 0,
+                        label: `Report generated: ${r.type}`,
+                        tag: 'report'
+                      })),
+                    ]
+                    .filter(a=>a.ts>0)
+                    .sort((a,b)=>b.ts-a.ts)
+                    .slice(0,6)
+                    .map((a,idx)=> (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-800">{a.label}</div>
+                        <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-700">{a.tag}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={monthlyBarData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="tons" name="Quantity (tons)" fill="#22c55e" radius={[4,4,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))}
+                    <div className="mt-2 text-xs text-gray-500">This year monthly harvest (tons)</div>
+                  </div>
                 </div>
               </div>
 
@@ -891,98 +801,6 @@ const FieldOfficerDashboard: React.FC = () => {
                 <p className="text-sm text-gray-500">Input Needs</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">Needs: {needsAttentionFields}</p>
                 <button onClick={()=>setShowReportModal(true)} className="mt-3 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Generate</button>
-              </div>
-            </div>
-
-            {/* Top Row - Crops Overview and Farm Image - EXACT Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Premium Crops Overview */}
-              <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-8 relative z-10 hover:shadow-3xl transition-all duration-300">
-                <h2 className="text-xl font-semibold mb-4">Crops Overview</h2>
-                
-                {/* Toggle buttons - EXACT from your image */}
-                <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-                  <button className="flex-1 py-2 px-4 bg-white rounded-md shadow-sm text-sm font-medium">
-                    By Category
-                  </button>
-                  <button className="flex-1 py-2 px-4 text-sm font-medium text-gray-600">
-                    By Health
-                  </button>
-                </div>
-
-                {/* Pie Chart - EXACT positioning */}
-                <div className="h-64 mb-4 flex justify-center">
-                  <ResponsiveContainer width={200} height={200}>
-                    <PieChart width={200} height={200}>
-                      <Pie
-                        data={cropCategoryData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        dataKey="value"
-                      >
-                        {cropCategoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Legend - EXACT from your image */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                      <span className="text-sm font-medium">Fruits</span>
-                    </div>
-                    <span className="text-sm text-gray-600">14,600</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                      <span className="text-sm font-medium">Vegetables</span>
-                    </div>
-                    <span className="text-sm text-gray-600">2,700</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                      <span className="text-sm font-medium">Grains</span>
-                    </div>
-                    <span className="text-sm text-gray-600">364,500</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Farm Image - EXACT from your image */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="relative h-64 bg-green-200 rounded-lg overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-300 to-green-500"></div>
-                  <div className="absolute top-4 right-4 bg-white rounded-lg p-3 shadow-sm">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <MapPin className="w-4 h-4 text-gray-600" />
-                      <span className="text-sm font-medium">Malakwal Farm</span>
-                      <Edit className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div className="text-center">
-                        <div className="text-gray-600">Crop Health</div>
-                        <div className="font-medium text-green-600">Good</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-gray-600">Sowing Date</div>
-                        <div className="font-medium">Feb 21, 2024</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-gray-600">Harvest Date</div>
-                        <div className="font-medium">Apr 25, 2024</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
