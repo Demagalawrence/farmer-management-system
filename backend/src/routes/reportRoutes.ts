@@ -6,12 +6,16 @@ import { validate, validateObjectId } from '../middleware/validation';
 const router = Router();
 const reportController = new ReportController();
 
-router.post('/', authenticate, authorize('manager', 'finance', 'field_officer'), validate('generateReport'), reportController.createReport);
-router.get('/:id', authenticate, validateObjectId('id'), reportController.getReportById);
-router.get('/type/:type', authenticate, reportController.getReportsByType);
-router.get('/user/:userId', authenticate, validateObjectId('userId'), reportController.getReportsByUser);
-router.get('/', authenticate, authorize('manager', 'finance', 'field_officer'), reportController.getAllReports);
-router.put('/:id', authenticate, authorize('manager'), validateObjectId('id'), reportController.updateReport);
-router.delete('/:id', authenticate, authorize('manager'), validateObjectId('id'), reportController.deleteReport);
+// Chart endpoints must come before parameterized routes
+router.get('/charts/payments', authenticate, authorize('manager'), reportController.getPaymentChart.bind(reportController));
+router.get('/charts/harvests', authenticate, authorize('manager'), reportController.getHarvestChart.bind(reportController));
+
+router.post('/', authenticate, authorize('manager', 'finance', 'field_officer'), validate('generateReport'), reportController.createReport.bind(reportController));
+router.get('/type/:type', authenticate, reportController.getReportsByType.bind(reportController));
+router.get('/user/:userId', authenticate, validateObjectId('userId'), reportController.getReportsByUser.bind(reportController));
+router.get('/', authenticate, authorize('manager', 'finance', 'field_officer'), reportController.getAllReports.bind(reportController));
+router.get('/:id', authenticate, validateObjectId('id'), reportController.getReportById.bind(reportController));
+router.put('/:id', authenticate, authorize('manager'), validateObjectId('id'), reportController.updateReport.bind(reportController));
+router.delete('/:id', authenticate, authorize('manager'), validateObjectId('id'), reportController.deleteReport.bind(reportController));
 
 export default router;

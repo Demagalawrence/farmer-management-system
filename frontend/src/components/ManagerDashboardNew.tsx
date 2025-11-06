@@ -6,6 +6,7 @@ import { paymentService } from '../services/paymentService';
 import { financeService } from '../services/financeService';
 import { harvestService } from '../services/harvestService';
 import { farmerService } from '../services/farmerService';
+import { formatUGX } from '../utils/currency';
 
 const ManagerDashboard: React.FC = () => {
   const { logout } = useAuth();
@@ -16,6 +17,7 @@ const ManagerDashboard: React.FC = () => {
   const [approvalsLoading, setApprovalsLoading] = React.useState(false);
   const [approvalsError, setApprovalsError] = React.useState('');
   const [allPayments, setAllPayments] = React.useState<any[]>([]);
+  const [recentHarvests, setRecentHarvests] = React.useState<any[]>([]);
   const [ratesModalOpen, setRatesModalOpen] = React.useState(false);
   const [ratesLoading, setRatesLoading] = React.useState(false);
   const [ratesError, setRatesError] = React.useState('');
@@ -28,17 +30,24 @@ const ManagerDashboard: React.FC = () => {
       try {
         setPpLoading(true);
         setPpError('');
-        const [pendingRes, approvalsRes, allPaysRes, farmersRes] = await Promise.all([
+        const [pendingRes, approvalsRes, allPaysRes, farmersRes, harvestsRes] = await Promise.all([
           paymentService.getPaymentsByStatus('pending'),
           financeService.getApprovalRequests('pending'),
           paymentService.getAllPayments(),
           farmerService.getAllFarmers(),
+          harvestService.getAllHarvests(),
         ]);
         if (!mounted) return;
         setPendingPayments(Array.isArray(pendingRes) ? pendingRes : (pendingRes?.items || []));
         setApprovals(approvalsRes?.data || approvalsRes || []);
         setAllPayments(allPaysRes?.data || allPaysRes || []);
         setFarmers(farmersRes?.data || farmersRes || []);
+        const hvArr = Array.isArray(harvestsRes) ? harvestsRes : (harvestsRes?.data || harvestsRes?.items || []);
+        setRecentHarvests(hvArr
+          .slice()
+          .sort((a:any,b:any)=> new Date(b.harvest_date||b.created_at||0).getTime()-new Date(a.harvest_date||a.created_at||0).getTime())
+          .slice(0,6)
+        );
       } catch (e) {
         if (!mounted) return;
         setPpError('Failed to load pending payments');
@@ -107,7 +116,7 @@ const ManagerDashboard: React.FC = () => {
 
   // Key metrics for cards
   const keyMetrics = [
-    { title: 'Total Revenue', value: '$742K', change: '+12.5%', icon: DollarSign, color: 'text-green-600' },
+    { title: 'Total Revenue', value: 'UGX 742K', change: '+12.5%', icon: DollarSign, color: 'text-green-600' },
     { title: 'Active Farms', value: '24', change: '+2', icon: MapPin, color: 'text-blue-600' },
     { title: 'Total Workers', value: '156', change: '+8', icon: Users, color: 'text-purple-600' },
     { title: 'Equipment', value: '89', change: '+3', icon: Truck, color: 'text-orange-600' }
@@ -174,7 +183,7 @@ const ManagerDashboard: React.FC = () => {
                       <div key={String(req._id || req.id)} className="p-3 bg-gray-50 rounded-lg border">
                         <div className="flex justify-between items-center">
                           <div className="text-sm text-gray-800">
-                            <div className="font-medium">Total: ${Number(total).toLocaleString()} · {farmerIds.length} farmer(s)</div>
+                            <div className="font-medium">Total: {formatUGX(Number(total))} · {farmerIds.length} farmer(s)</div>
                             <div className="text-gray-600 text-xs">Note: {req.note || '—'}</div>
                           </div>
                           <div className="space-x-2">
@@ -212,7 +221,7 @@ const ManagerDashboard: React.FC = () => {
                     <div key={(p._id || p.id) as string} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                       <div className="text-sm text-gray-800">
                         <div className="font-medium">Farmer: {(p.farmer_id && p.farmer_id.toString) ? p.farmer_id.toString() : (p.farmer_id || '—')}</div>
-                        <div className="text-gray-600">Amount: ${Number(p.amount).toLocaleString()}</div>
+                        <div className="text-gray-600">Amount: {formatUGX(Number(p.amount))}</div>
                       </div>
                       <button
                         onClick={() => approvePayment((p._id || p.id) as string)}
@@ -243,6 +252,31 @@ const ManagerDashboard: React.FC = () => {
               >
                 🚪 Logout
               </button>
+            </div>
+
+            {/* Recent Harvests */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex justify-between items-center mb-6">
+                <h2 className="text-xl font-semibold">Recent Harvests</h2>
+              </div>
+              {(!recentHarvests || recentHarvests.length===0) ? (
+                <p className="text-sm text-gray-600">No recent harvests.</p>
+              ) : (
+                <div className="space-y-3">
+                  {recentHarvests.map((h:any, idx:number)=>{
+                    const farmerName = (farmers.find((f:any)=> String(f._id)===String(h.farmer_id))?.name) || String(h.farmer_id).substring(0,6)+"…";
+                    return (
+                      <div key={(h._id||idx) as any} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-800">
+                          <div className="font-medium">{farmerName}</div>
+                          <div className="text-gray-600 text-xs">{h.crop_type || 'Crop'} · {Number(h.quantity_tons||0).toLocaleString()} tons</div>
+                        </div>
+                        <div className="text-xs text-gray-500">{h.harvest_date ? new Date(h.harvest_date).toLocaleDateString() : '—'}</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -369,7 +403,7 @@ const ManagerDashboard: React.FC = () => {
             </div>
           </div>
 
-          {/* Right Column - Crop Distribution and Activities */}
+          {/* Right Column - Crop Distribution, Recent Activities, Recent Harvests */}
           <div className="space-y-8">
             {/* Crop Distribution */}
             <div className="bg-white rounded-lg shadow-sm p-6">

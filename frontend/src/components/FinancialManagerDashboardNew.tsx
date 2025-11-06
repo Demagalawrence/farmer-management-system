@@ -4,6 +4,7 @@ import { DollarSign, TrendingUp, TrendingDown, CreditCard, AlertTriangle, PieCha
 import { useAuth } from '../contexts/AuthContext';
 import { paymentService } from '../services/paymentService';
 import { farmerService } from '../services/farmerService';
+import { formatUGX } from '../utils/currency';
 
 const FinancialManagerDashboard: React.FC = () => {
   const { logout } = useAuth();
@@ -21,7 +22,7 @@ const FinancialManagerDashboard: React.FC = () => {
   const [highlightApproved, setHighlightApproved] = React.useState(false);
 
   // Helpers and derived finance statistics
-  const currency = (n: number) => `$${Number(n || 0).toLocaleString()}`;
+  const currency = (n: number) => formatUGX(n);
   const totalDueAll = React.useMemo(() =>
     allPayments
       .filter((p) => p.status === 'pending' || p.status === 'approved')
@@ -122,10 +123,10 @@ const FinancialManagerDashboard: React.FC = () => {
   };
   // Financial KPIs data
   const financialKPIs = [
-    { title: 'Total Revenue', value: '$2.4M', change: '+12.5%', trend: 'up', icon: DollarSign },
-    { title: 'Net Profit', value: '$680K', change: '+8.2%', trend: 'up', icon: TrendingUp },
-    { title: 'Operating Costs', value: '$1.72M', change: '-3.1%', trend: 'down', icon: TrendingDown },
-    { title: 'Cash Flow', value: '$420K', change: '+15.7%', trend: 'up', icon: CreditCard }
+    { title: 'Total Revenue', value: 'UGX 2.4M', change: '+12.5%', trend: 'up', icon: DollarSign },
+    { title: 'Net Profit', value: 'UGX 680K', change: '+8.2%', trend: 'up', icon: TrendingUp },
+    { title: 'Operating Costs', value: 'UGX 1.72M', change: '-3.1%', trend: 'down', icon: TrendingDown },
+    { title: 'Cash Flow', value: 'UGX 420K', change: '+15.7%', trend: 'up', icon: CreditCard }
   ];
 
   // Revenue and profit trends data
@@ -153,12 +154,35 @@ const FinancialManagerDashboard: React.FC = () => {
     { category: 'Maintenance', allocated: 200000, spent: 175000, percentage: 88 }
   ];
 
-  // Payment status data
-  const paymentStatusData = [
-    { name: 'Completed', value: 65, color: '#22c55e', amount: 1560000 },
-    { name: 'Pending', value: 25, color: '#f59e0b', amount: 600000 },
-    { name: 'Overdue', value: 10, color: '#ef4444', amount: 240000 }
-  ];
+  // Payment status data (live)
+  const paymentStatusData = React.useMemo(() => {
+    const OVERDUE_DAYS = 30;
+    const now = Date.now();
+    let completedAmt = 0;
+    let pendingAmt = 0;
+    let overdueAmt = 0;
+
+    (allPayments || []).forEach((p: any) => {
+      const amt = Number(p.amount || 0);
+      if (!amt) return;
+      const created = p.created_at ? new Date(p.created_at).getTime() : undefined;
+      const ageDays = created ? Math.floor((now - created) / (1000 * 60 * 60 * 24)) : 0;
+      if (p.status === 'paid') {
+        completedAmt += amt;
+      } else if (p.status === 'pending' || p.status === 'approved') {
+        if (created && ageDays > OVERDUE_DAYS) overdueAmt += amt; else pendingAmt += amt;
+      }
+    });
+
+    const total = completedAmt + pendingAmt + overdueAmt;
+    const pct = (v: number) => (total > 0 ? Math.round((v / total) * 100) : 0);
+
+    return [
+      { name: 'Completed', value: pct(completedAmt), color: '#22c55e', amount: completedAmt },
+      { name: 'Pending', value: pct(pendingAmt), color: '#f59e0b', amount: pendingAmt },
+      { name: 'Overdue', value: pct(overdueAmt), color: '#ef4444', amount: overdueAmt },
+    ];
+  }, [allPayments]);
 
   // ROI by crop data
   const roiData = [
@@ -172,7 +196,7 @@ const FinancialManagerDashboard: React.FC = () => {
   // Financial alerts
   const financialAlerts = [
     { id: 1, type: 'warning', message: 'Equipment budget 95% utilized', priority: 'medium' },
-    { id: 2, type: 'danger', message: '10 overdue payments totaling $240K', priority: 'high' },
+    { id: 2, type: 'danger', message: '10 overdue payments totaling UGX 240K', priority: 'high' },
     { id: 3, type: 'info', message: 'Q4 profit target 85% achieved', priority: 'low' },
     { id: 4, type: 'warning', message: 'Utility costs increased by 12%', priority: 'medium' }
   ];
@@ -206,7 +230,7 @@ const FinancialManagerDashboard: React.FC = () => {
                       <div key={(p._id || p.id) as string} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="text-sm text-gray-800">
                           <div className="font-medium">{f?.name || f?.full_name || f?.first_name || 'Farmer'} <span className="text-gray-500">({String(p.farmer_id)})</span></div>
-                          <div className="text-gray-600">Amount: ${Number(p.amount).toLocaleString()}</div>
+                          <div className="text-gray-600">Amount: {formatUGX(Number(p.amount))}</div>
                         </div>
                         <button
                           onClick={() => openProcess(p)}
@@ -384,7 +408,7 @@ const FinancialManagerDashboard: React.FC = () => {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="month" />
                     <YAxis />
-                    <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, '']} />
+                    <Tooltip formatter={(value) => [formatUGX(Number(value)), '']} />
                     <Line 
                       type="monotone" 
                       dataKey="revenue" 
@@ -437,7 +461,7 @@ const FinancialManagerDashboard: React.FC = () => {
                       <span className="text-sm font-medium text-gray-700">{item.category}</span>
                       <div className="text-right">
                         <span className="text-sm font-bold text-gray-900">
-                          ${item.spent.toLocaleString()} / ${item.allocated.toLocaleString()}
+                          {formatUGX(item.spent)} / {formatUGX(item.allocated)}
                         </span>
                         <div className="text-xs text-gray-500">{item.percentage}% utilized</div>
                       </div>
@@ -512,7 +536,7 @@ const FinancialManagerDashboard: React.FC = () => {
                     </div>
                     <div className="text-right">
                       <div className="text-sm font-bold text-gray-900">{item.value}%</div>
-                      <div className="text-xs text-gray-500">${item.amount.toLocaleString()}</div>
+                      <div className="text-xs text-gray-500">{formatUGX(item.amount)}</div>
                     </div>
                   </div>
                 ))}
@@ -599,7 +623,7 @@ const FinancialManagerDashboard: React.FC = () => {
             <h3 className="text-lg font-semibold mb-4">Process Payment</h3>
             <div className="space-y-3 text-sm">
               <div className="flex justify-between"><span className="text-gray-600">Farmer ID</span><span className="font-medium">{String(selectedPayment.farmer_id)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-medium">${Number(selectedPayment.amount).toLocaleString()}</span></div>
+              <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-medium">{formatUGX(Number(selectedPayment.amount))}</span></div>
               <div>
                 <label className="block text-gray-700 mb-1">Payment Method</label>
                 <select value={payMethod} onChange={(e) => setPayMethod(e.target.value as any)} className="w-full border rounded px-3 py-2">

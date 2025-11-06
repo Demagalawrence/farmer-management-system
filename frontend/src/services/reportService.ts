@@ -43,4 +43,30 @@ export const reportService = {
     const response = await api.delete(`/reports/${id}`);
     return response.data;
   },
+  
+  // Manager charts: payments over time
+  getPaymentChart: async (params?: { start?: string | Date; end?: string | Date; interval?: 'day' | 'month' | 'year' }) => {
+    const { start, end, interval } = params || {};
+    const response = await api.get('/reports/charts/payments', {
+      params: {
+        start: start ? new Date(start).toISOString() : undefined,
+        end: end ? new Date(end).toISOString() : undefined,
+        interval,
+      }
+    });
+    return response.data;
+  },
+
+  // Manager charts: harvests over time
+  getHarvestChart: async (params?: { start?: string | Date; end?: string | Date; interval?: 'day' | 'month' | 'year' }) => {
+    const { start, end, interval } = params || {};
+    const response = await api.get('/reports/charts/harvests', {
+      params: {
+        start: start ? new Date(start).toISOString() : undefined,
+        end: end ? new Date(end).toISOString() : undefined,
+        interval,
+      }
+    });
+    return response.data;
+  },
 };

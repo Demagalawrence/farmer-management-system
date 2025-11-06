@@ -4,6 +4,7 @@ import { Search, Settings, Bell, User, Sun, Cloud, Droplets, Wind, Leaf, Trendin
 import { useWallpaper } from '../contexts/WallpaperContext';
 import { useAuth } from '../contexts/AuthContext';
 import WallpaperGallery from './WallpaperGallery';
+import { formatUGX } from '../utils/currency';
 
 const DarkModeDashboard: React.FC = () => {
   const { currentWallpaper, setWallpaper } = useWallpaper();
@@ -299,7 +300,7 @@ const DarkModeDashboard: React.FC = () => {
                 </div>
                 <span className="text-sm text-gray-400">Yearly ▼</span>
               </div>
-              <div className="text-2xl font-bold mb-4">$ 268,663</div>
+              <div className="text-2xl font-bold mb-4">{formatUGX(268663)}</div>
               <div className="h-48">
                 <ResponsiveContainer width="100%" height="100%">
                   <AreaChart data={financeData}>
