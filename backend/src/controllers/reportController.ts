@@ -15,7 +15,11 @@ export class ReportController {
   async createReport(req: Request, res: Response): Promise<void> {
     try {
       const service = getReportService();
-      const report = await service.create(req.body);
+      const payload: any = { ...req.body };
+      if (!payload.generated_by && req.user?.id) {
+        payload.generated_by = req.user.id;
+      }
+      const report = await service.create(payload);
       res.status(201).json({ success: true, data: report });
     } catch (error: any) {
       res.status(400).json({ success: false, message: error.message });
@@ -100,6 +104,33 @@ export class ReportController {
       }
       
       res.status(200).json({ success: true, message: 'Report deleted successfully' });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  // Chart endpoints for managers
+  async getPaymentChart(req: Request, res: Response): Promise<void> {
+    try {
+      const service = getReportService();
+      const { start, end, interval = 'month' } = req.query as any;
+      const startDate = start ? new Date(start) : new Date(new Date().getFullYear(), 0, 1);
+      const endDate = end ? new Date(end) : new Date();
+      const data = await (service as any).aggregatePayments(startDate, endDate, String(interval));
+      res.status(200).json({ success: true, data });
+    } catch (error: any) {
+      res.status(500).json({ success: false, message: error.message });
+    }
+  }
+
+  async getHarvestChart(req: Request, res: Response): Promise<void> {
+    try {
+      const service = getReportService();
+      const { start, end, interval = 'month' } = req.query as any;
+      const startDate = start ? new Date(start) : new Date(new Date().getFullYear(), 0, 1);
+      const endDate = end ? new Date(end) : new Date();
+      const data = await (service as any).aggregateHarvests(startDate, endDate, String(interval));
+      res.status(200).json({ success: true, data });
     } catch (error: any) {
       res.status(500).json({ success: false, message: error.message });
     }

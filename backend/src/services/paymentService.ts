@@ -1,6 +1,7 @@
 import { Collection, ObjectId } from 'mongodb';
 import { Payment, PaymentInput } from '../models/Payment';
 import { getDb } from '../config/db';
+import { EmailService } from './emailService';
 
 export class PaymentService {
   private collection: Collection<Payment>;
@@ -80,7 +81,34 @@ export class PaymentService {
       { $set: payment },
       { returnDocument: 'after' }
     );
-    // Notify managers when a payment is processed (marked as paid)
+    try {
+      if (payment && (payment as any).status === 'approved' && result) {
+        const db = getDb();
+        const farmer = await db.collection('farmers').findOne({ _id: (result as any).farmer_id });
+        if (farmer && farmer.email) {
+          const amount = (result as any).amount;
+          const subject = 'Payment Approved';
+          const text = `Hello ${farmer.name || 'Farmer'}, your payment of ${amount} has been approved. You will receive the funds shortly.`;
+          await EmailService.send(farmer.email, subject, text);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to send approval email:', e);
+    }
+    try {
+      if (payment && (payment as any).status === 'paid' && result) {
+        const db = getDb();
+        const farmer = await db.collection('farmers').findOne({ _id: (result as any).farmer_id });
+        if (farmer && farmer.email) {
+          const amount = (result as any).amount;
+          const subject = 'Payment Completed';
+          const text = `Hello ${farmer.name || 'Farmer'}, your payment of ${amount} has been completed and disbursed. Thank you.`;
+          await EmailService.send(farmer.email, subject, text);
+        }
+      }
+    } catch (e) {
+      console.error('Failed to send paid email:', e);
+    }
     try {
       if (payment && (payment as any).status === 'paid' && result) {
         const db = getDb();
@@ -95,7 +123,6 @@ export class PaymentService {
         });
       }
     } catch (e) {
-      // best-effort notification; do not fail the update if notify fails
       console.error('Failed to create notification for payment:', e);
     }
     return result;

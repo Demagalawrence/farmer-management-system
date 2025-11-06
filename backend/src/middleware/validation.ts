@@ -90,7 +90,7 @@ export const schemas = {
     crop_stage: Joi.string().valid('planted', 'growing', 'flowering', 'mature', 'harvested').optional(),
   }).min(1),
 
-  // Harvest schemas
+  // Harvest schemas (align with model + UI: quantity_tons required; others optional)
   createHarvest: Joi.object({
     farmer_id: Joi.alternatives().try(
       Joi.string().pattern(/^[0-9a-fA-F]{24}$/),
@@ -102,16 +102,16 @@ export const schemas = {
       Joi.string().pattern(/^F-\d{4}$/),
       Joi.number().integer().positive()
     ).required(),
-    crop_type: Joi.string().min(2).max(100).required(),
-    quantity: Joi.number().positive().required(),
-    quality_grade: Joi.string().valid('A', 'B', 'C').required(),
-    harvest_date: Joi.date().iso().required(),
-    price_per_unit: Joi.number().positive().required(),
+    quantity_tons: Joi.number().positive().required(),
+    quality_grade: Joi.string().valid('A', 'B', 'C').optional(),
+    harvest_date: Joi.date().iso().optional(),
+    crop_type: Joi.string().min(2).max(100).optional(),
+    price_per_unit: Joi.number().positive().optional(),
   }),
 
   updateHarvest: Joi.object({
     crop_type: Joi.string().min(2).max(100).optional(),
-    quantity: Joi.number().positive().optional(),
+    quantity_tons: Joi.number().positive().optional(),
     quality_grade: Joi.string().valid('A', 'B', 'C').optional(),
     harvest_date: Joi.date().iso().optional(),
     price_per_unit: Joi.number().positive().optional(),
@@ -143,10 +143,15 @@ export const schemas = {
 
   // Report schemas
   generateReport: Joi.object({
-    type: Joi.string().valid('harvest', 'payment', 'farmer', 'financial').required(),
-    start_date: Joi.date().iso().optional(),
-    end_date: Joi.date().iso().min(Joi.ref('start_date')).optional(),
-    filters: Joi.object().optional(),
+    // Align to backend Report model
+    type: Joi.string().valid('harvest_summary', 'payment_report', 'performance').required(),
+    generated_by: Joi.alternatives().try(
+      Joi.string().pattern(/^[0-9a-fA-F]{24}$/),
+      Joi.any() // controller may inject from req.user
+    ).optional(),
+    date_range_start: Joi.date().iso().required(),
+    date_range_end: Joi.date().iso().min(Joi.ref('date_range_start')).required(),
+    data: Joi.object().required(),
   }),
 
   // Finance/Budget schemas

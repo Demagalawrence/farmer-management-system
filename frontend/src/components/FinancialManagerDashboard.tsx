@@ -3,6 +3,7 @@ import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContai
 import { DollarSign, TrendingUp, TrendingDown, CreditCard, PiggyBank, Calculator } from 'lucide-react';
 import { paymentService } from '../services/paymentService';
 import { farmerService } from '../services/farmerService';
+import { formatUGX } from '../utils/currency';
 
 const FinancialManagerDashboard: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
@@ -112,7 +113,7 @@ const FinancialManagerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Revenue</p>
-                <p className="text-3xl font-bold text-gray-900">$167K</p>
+                <p className="text-3xl font-bold text-gray-900">UGX 167K</p>
                 <p className="text-sm text-green-600 mt-1 flex items-center">
                   <TrendingUp className="w-4 h-4 mr-1" />
                   +12.5% vs last month
@@ -129,7 +130,7 @@ const FinancialManagerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Net Profit</p>
-                <p className="text-3xl font-bold text-gray-900">$52K</p>
+                <p className="text-3xl font-bold text-gray-900">UGX 52K</p>
                 <p className="text-sm text-green-600 mt-1 flex items-center">
                   <TrendingUp className="w-4 h-4 mr-1" />
                   +8.3% vs last month
@@ -146,7 +147,7 @@ const FinancialManagerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Total Expenses</p>
-                <p className="text-3xl font-bold text-gray-900">$115K</p>
+                <p className="text-3xl font-bold text-gray-900">UGX 115K</p>
                 <p className="text-sm text-red-600 mt-1 flex items-center">
                   <TrendingUp className="w-4 h-4 mr-1" />
                   +6.7% vs last month
@@ -163,7 +164,7 @@ const FinancialManagerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Cash Flow</p>
-                <p className="text-3xl font-bold text-gray-900">$58K</p>
+                <p className="text-3xl font-bold text-gray-900">UGX 58K</p>
                 <p className="text-sm text-green-600 mt-1 flex items-center">
                   <TrendingUp className="w-4 h-4 mr-1" />
                   +15.2% vs last month
@@ -195,7 +196,7 @@ const FinancialManagerDashboard: React.FC = () => {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="month" />
                   <YAxis />
-                  <Tooltip formatter={(value) => [`$${value.toLocaleString()}`, '']} />
+                  <Tooltip formatter={(value) => [formatUGX(Number(value)), '']} />
                   <Line 
                     type="monotone" 
                     dataKey="revenue" 
@@ -231,7 +232,7 @@ const FinancialManagerDashboard: React.FC = () => {
                 <div key={index} className="space-y-2">
                   <div className="flex justify-between items-center">
                     <span className="text-sm font-medium">{item.category}</span>
-                    <span className="text-sm text-gray-600">${item.amount.toLocaleString()}</span>
+                    <span className="text-sm text-gray-600">{formatUGX(item.amount)}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2">
                     <div
@@ -269,7 +270,7 @@ const FinancialManagerDashboard: React.FC = () => {
                     <tr key={String(p._id)} className="border-t">
                       <td className="py-2 pr-4">{farmer ? farmer.name || farmer.full_name || farmer.first_name : String(p.farmer_id)}</td>
                       <td className="py-2 pr-4">{p.purpose || '-'}</td>
-                      <td className="py-2 pr-4">${(p.amount || 0).toLocaleString()}</td>
+                      <td className="py-2 pr-4">{formatUGX(p.amount || 0)}</td>
                       <td className="py-2 pr-4">{p.requested_at ? new Date(p.requested_at).toLocaleString() : '-'}</td>
                       <td className="py-2 pr-4 space-x-2">
                         <button onClick={() => approvePayment(String(p._id))} className="px-3 py-1 rounded bg-green-600 text-white">Approve</button>
@@ -364,14 +365,14 @@ const FinancialManagerDashboard: React.FC = () => {
                   <p className="font-medium text-sm">Overdue Payments</p>
                   <p className="text-xs text-gray-600">15 farmers</p>
                 </div>
-                <p className="text-lg font-bold text-red-600">$23,450</p>
+                <p className="text-lg font-bold text-red-600">UGX 23,450</p>
               </div>
               <div className="flex justify-between items-center p-3 bg-yellow-50 rounded-lg">
                 <div>
                   <p className="font-medium text-sm">Due This Week</p>
                   <p className="text-xs text-gray-600">28 farmers</p>
                 </div>
-                <p className="text-lg font-bold text-yellow-600">$45,200</p>
+                <p className="text-lg font-bold text-yellow-600">UGX 45,200</p>
               </div>
             </div>
           </div>
@@ -385,7 +386,7 @@ const FinancialManagerDashboard: React.FC = () => {
             <div className="space-y-3">
               <div className="flex justify-between items-center">
                 <span className="text-sm">Cost per Acre</span>
-                <span className="font-medium">$412</span>
+                <span className="font-medium">UGX 412</span>
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm">Labor Cost Ratio</span>

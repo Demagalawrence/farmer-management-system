@@ -6,6 +6,7 @@ import { farmerService } from '../services/farmerService';
 import { fieldService } from '../services/fieldService';
 import { harvestService } from '../services/harvestService';
 import { paymentService } from '../services/paymentService';
+import { formatUGX } from '../utils/currency';
 
 const ManagerDashboard: React.FC = () => {
   const { user } = useAuth();
@@ -135,7 +136,7 @@ const ManagerDashboard: React.FC = () => {
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm text-gray-600">Monthly Revenue</p>
-                <p className="text-3xl font-bold text-gray-900">$67,000</p>
+                <p className="text-3xl font-bold text-gray-900">{formatUGX(67000)}</p>
                 <p className="text-sm text-green-600 mt-1">↗ +18% from last month</p>
               </div>
               <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center">
@@ -319,7 +320,7 @@ const ManagerDashboard: React.FC = () => {
             </div>
             <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">
               <div className="w-2 h-2 bg-blue-500 rounded-full"></div>
-              <span className="text-sm">Payment processed for Farmer John Smith - $3,200</span>
+              <span className="text-sm">Payment processed for Farmer John Smith - {formatUGX(3200)}</span>
               <span className="text-xs text-gray-500 ml-auto">4 hours ago</span>
             </div>
             <div className="flex items-center space-x-4 p-3 bg-gray-50 rounded-lg">

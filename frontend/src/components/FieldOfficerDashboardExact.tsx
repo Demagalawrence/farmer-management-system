@@ -108,6 +108,14 @@ const FieldOfficerDashboard: React.FC = () => {
         quantity_tons: qty,
         quality_grade: harvestForm.quality_grade,
       } as any);
+      // Refresh harvests so UI (Recent Activities) reflects the new record immediately
+      try {
+        const hvs = await harvestService.getAllHarvests();
+        const hvArr = Array.isArray(hvs) ? hvs : (hvs?.items || hvs?.data || []);
+        setHarvests(hvArr);
+      } catch (e) {
+        // ignore refresh errors
+      }
       setActionMessage('✅ Crop/harvest data recorded');
       setShowHarvestModal(false);
       setHarvestForm({ field_id: '', farmer_id: '', quantity_tons: '', quality_grade: 'A' });
@@ -270,6 +278,9 @@ const FieldOfficerDashboard: React.FC = () => {
   const [showReportModal, setShowReportModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
 
+  // Crops overview tab (category | health)
+  const [overviewTab, setOverviewTab] = useState<'category' | 'health'>('category');
+
   // Forms
   const [fieldForm, setFieldForm] = useState({
     farmer_id: '',
@@ -297,6 +308,47 @@ const FieldOfficerDashboard: React.FC = () => {
   });
   const [actionMessage, setActionMessage] = useState('');
   const [actionError, setActionError] = useState('');
+
+  // Derived: Crops overview data from actual records
+  const categoryData = React.useMemo(() => {
+    const sums: Record<string, number> = {};
+    const norm = (s: string) => (s || '').toLowerCase();
+    const toCategory = (crop: string): 'Fruits' | 'Vegetables' | 'Grains' | 'Other' => {
+      const c = norm(crop);
+      if (/wheat|barley|rice|corn|maize|oats|millet|grain/.test(c)) return 'Grains';
+      if (/vegetable|tomato|onion|cabbage|carrot|potato|beans|pea|spinach/.test(c)) return 'Vegetables';
+      if (c) return 'Fruits';
+      return 'Other';
+    };
+    (harvests || []).forEach((h: any) => {
+      const cat = toCategory(h.crop_type || '');
+      const qty = Number(h.quantity_tons || 0);
+      sums[cat] = (sums[cat] || 0) + qty;
+    });
+    const res = [
+      { name: 'Fruits', value: sums['Fruits'] || 0, color: '#FFA500' },
+      { name: 'Vegetables', value: sums['Vegetables'] || 0, color: '#90EE90' },
+      { name: 'Grains', value: sums['Grains'] || 0, color: '#228B22' },
+    ];
+    // If all zero and no data, keep empty to avoid misleading chart
+    return res.some(d => d.value > 0) ? res : res;
+  }, [harvests]);
+
+  const healthData = React.useMemo(() => {
+    const counts: Record<string, number> = { healthy: 0, needs_attention: 0, critical: 0 };
+    (fields || []).forEach((f: any) => {
+      const h = (f.health_status || '').toLowerCase();
+      if (h === 'healthy') counts.healthy += 1;
+      else if (h === 'needs_attention') counts.needs_attention += 1;
+      else if (h === 'critical') counts.critical += 1;
+    });
+    const res = [
+      { name: 'Healthy', value: counts.healthy, color: '#22c55e' },
+      { name: 'Needs Attention', value: counts.needs_attention, color: '#f59e0b' },
+      { name: 'Critical', value: counts.critical, color: '#ef4444' },
+    ];
+    return res;
+  }, [fields]);
 
   // Fetch data and compute derived stats
   React.useEffect(() => {
@@ -656,6 +708,59 @@ const FieldOfficerDashboard: React.FC = () => {
               </div>
               <FieldGoogleMap farmers={farmers} height="340px" />
               <p className="mt-2 text-xs text-gray-500">Tip: Set VITE_GOOGLE_MAPS_API_KEY in frontend .env to enable Google Maps tiles. Without it, a fallback message will display.</p>
+            </div>
+
+            {/* Crops Overview */}
+            <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold">Crops Overview</h2>
+                <div className="flex items-center bg-gray-100 rounded-lg text-xs">
+                  <button
+                    className={`px-3 py-1 rounded-l-lg ${overviewTab==='category' ? 'bg-white shadow font-medium' : 'text-gray-600'}`}
+                    onClick={() => setOverviewTab('category')}
+                  >By Category</button>
+                  <button
+                    className={`px-3 py-1 rounded-r-lg ${overviewTab==='health' ? 'bg-white shadow font-medium' : 'text-gray-600'}`}
+                    onClick={() => setOverviewTab('health')}
+                  >By Health</button>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
+                <div className="h-56">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={overviewTab==='category' ? categoryData : healthData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={50}
+                        outerRadius={80}
+                        dataKey="value"
+                      >
+                        {(overviewTab==='category' ? categoryData : healthData).map((entry:any, index:number) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="space-y-3">
+                  {(overviewTab==='category' ? categoryData : healthData).map((item:any, idx:number) => (
+                    <div key={idx} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-gray-900">{Number(item.value).toLocaleString()}</div>
+                        <div className="text-xs text-gray-500">{overviewTab==='category' ? 'tons' : 'fields'}</div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
             </div>
 
             {/* Stats Row */}
