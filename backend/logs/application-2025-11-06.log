@@ -98,3 +98,30 @@
 {"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 17:51:30"}
 {"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 17:51:30"}
 {"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 17:51:30"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"User logged in: finance1@gmail.com","timestamp":"2025-11-06 17:55:50"}
+{"level":"info","message":"User logged in: mag@gmial.com","timestamp":"2025-11-06 17:57:00"}
+{"level":"info","message":"User logged in: buayism@gmail.com","timestamp":"2025-11-06 17:59:18"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 19:36:35"}
