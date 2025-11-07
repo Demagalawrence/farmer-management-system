@@ -125,3 +125,14 @@
 {"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 19:36:35"}
 {"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 19:36:35"}
 {"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"User logged in: mag@gmial.com","timestamp":"2025-11-06 20:37:52"}
+{"level":"info","message":"User logged in: finance1@gmail.com","timestamp":"2025-11-06 20:39:48"}
+{"level":"info","message":"User logged in: buayism@gmail.com","timestamp":"2025-11-06 20:41:01"}
+{"level":"info","message":"User logged in: mag@gmial.com","timestamp":"2025-11-06 20:41:47"}
+{"level":"info","message":"User logged in: buayism@gmail.com","timestamp":"2025-11-06 20:41:57"}
