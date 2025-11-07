@@ -121,7 +121,7 @@ See [backend/README.md](backend/README.md) for detailed API documentation.
 
 ## Database Schema
 
-See [database/mongodb-schema.md](database/mongodb-schema.md) for detailed information about the MongoDB collections and their relationships.
+See [database/mongodb-schema.md](database/mongodb-schema.md) for detailed information about the MongoDB collections and their relationships how they work.
 
 ## License
 

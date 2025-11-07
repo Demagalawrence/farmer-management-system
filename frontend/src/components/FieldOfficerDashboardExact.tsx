@@ -243,6 +243,9 @@ const FieldOfficerDashboard: React.FC = () => {
   const [showWallpaperGallery, setShowWallpaperGallery] = useState(false);
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [paymentForm, setPaymentForm] = useState({ farmer_id: '', amount: '', purpose: '' });
   const [registerForm, setRegisterForm] = useState({
     name: '',
     email: '',
@@ -269,7 +272,6 @@ const FieldOfficerDashboard: React.FC = () => {
   const [activeFields, setActiveFields] = useState<number>(0);
   const [needsAttentionFields, setNeedsAttentionFields] = useState<number>(0);
   const [pendingVerifications, setPendingVerifications] = useState<number>(0);
-  const [visitsScheduled, setVisitsScheduled] = useState<number>(0); // placeholder until endpoint exists
 
   // Action modals visibility
   const [showFieldModal, setShowFieldModal] = useState(false);
@@ -316,6 +318,29 @@ const FieldOfficerDashboard: React.FC = () => {
     return months.map(m => ({ month: m, tons: sums[m] }));
   }, [harvests]);
 
+  // Robust harvest readiness count (supports various stage spellings)
+  const readyFieldsCount = React.useMemo(() => {
+    const norm = (v: string) => String(v || '').toLowerCase().replace(/[\s-]+/g, '_');
+    // Supported values/aliases considered as ready
+    const readySet = new Set([
+      'harvest_ready',
+      'ready',
+      'ready_to_harvest',
+      'mature',
+      'harvest',
+      'ripe',
+      'harvestready'
+    ]);
+    // Supported property keys to look at
+    const stageKeys = ['crop_stage', 'cropStage', 'stage', 'harvest_stage', 'harvestStage'];
+    return (fields || []).filter((f: any) => {
+      for (const k of stageKeys) {
+        if (k in f && readySet.has(norm((f as any)[k]))) return true;
+      }
+      return false;
+    })?.length || 0;
+  }, [fields]);
+
   
 
   // Fetch data and compute derived stats
@@ -341,8 +366,8 @@ const FieldOfficerDashboard: React.FC = () => {
         const newW = fmArr.filter((f: any) => f.registration_date && new Date(f.registration_date) >= weekAgo).length;
         setNewFarmersWeek(newW);
 
-        // Pending verifications (inactive farmers as proxy)
-        const pending = fmArr.filter((f: any) => f.status === 'inactive').length;
+        // Pending verifications: any farmer not explicitly active (case-insensitive)
+        const pending = fmArr.filter((f: any) => (String(f.status || '').toLowerCase() !== 'active')).length;
         setPendingVerifications(pending);
 
         // Fields
@@ -367,8 +392,7 @@ const FieldOfficerDashboard: React.FC = () => {
         if (!mounted) return;
         setReports(rpArr);
 
-        // Visits scheduled placeholder (0 until endpoint exists)
-        setVisitsScheduled(0);
+        // Visits suggested: count of fields needing attention (derived above)
       } catch (e) {
         if (!mounted) return;
         setFarmerCountError('Failed to load dashboard data');
@@ -778,8 +802,8 @@ const FieldOfficerDashboard: React.FC = () => {
                     <span className="font-semibold">{pendingVerifications}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span>Field visits scheduled</span>
-                    <span className="font-semibold">{visitsScheduled}</span>
+                    <span>Visits suggested</span>
+                    <span className="font-semibold">{needsAttentionFields}</span>
                   </div>
                 </div>
               </div>
@@ -794,7 +818,7 @@ const FieldOfficerDashboard: React.FC = () => {
               </div>
               <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
                 <p className="text-sm text-gray-500">Harvest Readiness</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">Ready: {fields.filter((x:any)=>x.crop_stage==='harvest_ready').length}</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">Ready: {readyFieldsCount}</p>
                 <button onClick={()=>setShowReportModal(true)} className="mt-3 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Generate</button>
               </div>
               <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
