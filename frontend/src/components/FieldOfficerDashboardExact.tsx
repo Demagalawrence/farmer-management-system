@@ -102,12 +102,22 @@ const FieldOfficerDashboard: React.FC = () => {
         setActionError('Quantity (tons) must be a positive number.');
         return;
       }
-      await harvestService.createHarvest({
+      if (!harvestForm.crop_name || harvestForm.crop_name.trim().length < 2) {
+        setActionError('Please enter a crop name.');
+        return;
+      }
+      const createdRes = await harvestService.createHarvest({
         field_id: harvestForm.field_id as unknown as any,
         farmer_id: harvestForm.farmer_id as unknown as any,
+        crop_name: harvestForm.crop_name as unknown as any,
+        crop: harvestForm.crop_name as unknown as any,
         quantity_tons: qty,
         quality_grade: harvestForm.quality_grade,
       } as any);
+      const created = (createdRes && (createdRes as any).data) ? (createdRes as any).data : createdRes;
+      if (created) {
+        setHarvests((prev) => [created as any, ...(prev || [])]);
+      }
       // Refresh harvests so UI (Recent Activities) reflects the new record immediately
       try {
         const hvs = await harvestService.getAllHarvests();
@@ -118,7 +128,7 @@ const FieldOfficerDashboard: React.FC = () => {
       }
       setActionMessage('✅ Crop/harvest data recorded');
       setShowHarvestModal(false);
-      setHarvestForm({ field_id: '', farmer_id: '', quantity_tons: '', quality_grade: 'A' });
+      setHarvestForm({ field_id: '', farmer_id: '', crop_name: '', quantity_tons: '', quality_grade: 'A' });
     } catch (err) {
       setActionError('Failed to record crop data');
     }
@@ -162,6 +172,37 @@ const FieldOfficerDashboard: React.FC = () => {
       setPaymentForm({ farmer_id: '', amount: '', purpose: '' });
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to request payment';
+      setActionError(msg);
+    }
+  };
+  const submitBudgetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionError('');
+    setActionMessage('');
+    try {
+      const toNum = (v: string) => {
+        const n = parseFloat(v as any);
+        return isNaN(n) ? 0 : n;
+      };
+      const items = {
+        seeds: toNum(budgetForm.seeds),
+        fertilizers: toNum(budgetForm.fertilizers),
+        equipment: toNum(budgetForm.equipment),
+        water: toNum(budgetForm.water),
+        other: toNum(budgetForm.other),
+      };
+      const total_amount = Object.values(items).reduce((a, b) => a + (b as number), 0);
+      await reportService.createReport({
+        type: 'payment_report',
+        date_range_start: new Date(),
+        date_range_end: new Date(),
+        data: { category: 'budget_request', items, total_amount, notes: budgetForm.notes, sent_to: 'finance' },
+      } as any);
+      setActionMessage('✅ Budget request sent to Finance');
+      setShowBudgetModal(false);
+      setBudgetForm({ seeds: '', fertilizers: '', equipment: '', water: '', other: '', notes: '' });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to submit budget request';
       setActionError(msg);
     }
   };
@@ -278,6 +319,7 @@ const FieldOfficerDashboard: React.FC = () => {
   const [showHarvestModal, setShowHarvestModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
 
   
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
@@ -293,6 +335,7 @@ const FieldOfficerDashboard: React.FC = () => {
   const [harvestForm, setHarvestForm] = useState({
     field_id: '',
     farmer_id: '',
+    crop_name: '',
     quantity_tons: '',
     quality_grade: 'A' as 'A' | 'B' | 'C'
   });
@@ -302,6 +345,21 @@ const FieldOfficerDashboard: React.FC = () => {
     date_range_end: '',
     notes: ''
   });
+  const [budgetForm, setBudgetForm] = useState({
+    seeds: '',
+    fertilizers: '',
+    equipment: '',
+    water: '',
+    other: '',
+    notes: ''
+  });
+  const budgetTotal = React.useMemo(() => {
+    const n = (v: string) => {
+      const x = parseFloat(v as any);
+      return isNaN(x) ? 0 : x;
+    };
+    return n(budgetForm.seeds) + n(budgetForm.fertilizers) + n(budgetForm.equipment) + n(budgetForm.water) + n(budgetForm.other);
+  }, [budgetForm]);
   // Derived: Monthly harvest quantities (auto, current year)
   const monthlyBarData = React.useMemo(() => {
     const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
@@ -447,15 +505,68 @@ const FieldOfficerDashboard: React.FC = () => {
     { date: 'Tue 38', openSoil: 30, low: 55, ideal: 70, high: 25, cloud: 30 }
   ];
 
-  // My crops data - EXACT from your image
-  const myCropsData = [
-    { name: 'Barley', progress: 90, color: '#90EE90', status: 'Excellent' },
-    { name: 'Millet', progress: 65, color: '#90EE90', status: 'Sprouting' },
-    { name: 'Corn', progress: 25, color: '#DEB887', status: 'Planted' },
-    { name: 'Oats', progress: 70, color: '#FFD700', status: 'Sprouting' },
-    { name: 'Rice', progress: 10, color: '#FFA500', status: 'Planted' },
-    { name: 'Wheat', progress: 100, color: '#8B4513', status: 'Harvest' }
-  ];
+  // My Crops derived from data (harvests + fields)
+  const myCropsData = React.useMemo(() => {
+    const norm = (s: any) => String(s || '').trim();
+    const cap = (s: string) => s ? (s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()) : s;
+    const stageNorm = (v: string) => String(v || '').toLowerCase().replace(/\s+/g, '_');
+    const stageToProgress: Record<string, number> = {
+      planted: 25,
+      planting: 25,
+      sprouting: 65,
+      growing: 70,
+      mature: 90,
+      harvest_ready: 100,
+      harvest: 100,
+      ripe: 100,
+    };
+    const stageToLabel: Record<string, string> = {
+      planted: 'Planted',
+      planting: 'Planted',
+      sprouting: 'Sprouting',
+      growing: 'Growing',
+      mature: 'Excellent',
+      harvest_ready: 'Harvest',
+      harvest: 'Harvest',
+      ripe: 'Harvest',
+    };
+    const colorFor = (p: number) => p >= 90 ? '#90EE90' : p >= 70 ? '#FFD700' : p >= 40 ? '#FFA500' : '#DEB887';
+
+    // Map field_id -> stage
+    const fieldStage: Record<string, string> = {};
+    (fields || []).forEach((f: any) => {
+      const id = String(f._id || f.id || '');
+      const st = stageNorm(f.crop_stage || f.stage || f.harvest_stage || '');
+      if (id) fieldStage[id] = st;
+    });
+
+    // Aggregate by crop name taking latest progress per crop
+    const agg: Record<string, { name: string; progress: number; status: string; color: string } > = {};
+    (harvests || []).forEach((h: any) => {
+      const cname = cap(norm(h.crop_name || h.cropName || h.crop));
+      if (!cname) return;
+      const fid = String(h.field_id || h.fieldId || '');
+      const stKey = fieldStage[fid] || '';
+      let progress = stKey ? (stageToProgress[stKey] ?? 40) : 40;
+      // If explicitly harvest record exists, prefer 100
+      if (stKey === 'harvest' || stKey === 'harvest_ready') progress = 100;
+      const status = stKey ? (stageToLabel[stKey] || (progress >= 90 ? 'Excellent' : progress >= 70 ? 'Good' : progress >= 40 ? 'Fair' : 'Needs Attention'))
+                           : (progress >= 90 ? 'Excellent' : progress >= 70 ? 'Good' : progress >= 40 ? 'Fair' : 'Needs Attention');
+      const color = colorFor(progress);
+      if (!(cname in agg) || agg[cname].progress < progress) {
+        agg[cname] = { name: cname, progress, status, color };
+      }
+    });
+
+    // Return array; if empty, show a helpful placeholder
+    const arr = Object.values(agg);
+    if (!arr.length) {
+      return [
+        { name: 'No crops yet', progress: 0, color: '#e5e7eb', status: 'Record Crop Data to see crops here' }
+      ];
+    }
+    return arr.sort((a, b) => b.progress - a.progress).slice(0, 8);
+  }, [harvests, fields]);
 
   const handleWallpaperSelect = (wallpaper: any) => {
     setWallpaper(wallpaper);
@@ -660,6 +771,13 @@ const FieldOfficerDashboard: React.FC = () => {
               >
                 <span className="text-sm">💳</span>
                 <span className="font-medium">Request Payment</span>
+              </button>
+              <button 
+                onClick={() => setShowBudgetModal(true)}
+                className="w-full mt-2 flex items-center space-x-3 bg-amber-500 hover:bg-amber-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
+              >
+                <span className="text-sm">📑</span>
+                <span className="font-medium">Budget Request</span>
               </button>
             </nav>
           </div>
@@ -1107,6 +1225,7 @@ const FieldOfficerDashboard: React.FC = () => {
             <form onSubmit={submitHarvestData} className="space-y-4">
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Field ID" value={harvestForm.field_id} onChange={(e)=>setHarvestForm({...harvestForm, field_id: e.target.value})} required />
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Farmer ID" value={harvestForm.farmer_id} onChange={(e)=>setHarvestForm({...harvestForm, farmer_id: e.target.value})} required />
+              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Crop Name (e.g., Maize)" value={harvestForm.crop_name} onChange={(e)=>setHarvestForm({...harvestForm, crop_name: e.target.value})} required />
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Quantity (tons)" value={harvestForm.quantity_tons} onChange={(e)=>setHarvestForm({...harvestForm, quantity_tons: e.target.value})} required />
               <select className="w-full px-4 py-2 border rounded-lg" value={harvestForm.quality_grade} onChange={(e)=>setHarvestForm({...harvestForm, quality_grade: e.target.value as any})}>
                 <option value="A">A</option>
@@ -1169,6 +1288,71 @@ const FieldOfficerDashboard: React.FC = () => {
               <div className="flex space-x-3 pt-2">
                 <button type="button" onClick={()=>setShowPaymentModal(false)} className="flex-1 px-4 py-3 border rounded-lg">Cancel</button>
                 <button type="submit" className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg">Send</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Budget Request Modal */}
+      {showBudgetModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto relative z-[10000]">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">📑 Budget Request</h2>
+              <button onClick={() => setShowBudgetModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={submitBudgetRequest} className="space-y-4">
+              {[
+                { key: 'seeds', label: 'Seeds' },
+                { key: 'fertilizers', label: 'Fertilizers' },
+                { key: 'equipment', label: 'Equipment' },
+                { key: 'water', label: 'Water' },
+                { key: 'other', label: 'Other' },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{label} (amount)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={(budgetForm as any)[key]}
+                    onChange={(e) => setBudgetForm({ ...budgetForm, [key]: e.target.value } as any)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="0.00"
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={budgetForm.notes}
+                  onChange={(e) => setBudgetForm({ ...budgetForm, notes: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="Describe purpose, timeframe, supplier, etc."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <span className="text-sm font-medium text-amber-800">Total</span>
+                <span className="text-lg font-bold text-amber-900">{budgetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+
+              {actionError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{actionError}</div>
+              )}
+              {actionMessage && (
+                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">{actionMessage}</div>
+              )}
+
+              <div className="flex justify-end space-x-3">
+                <button type="button" onClick={() => setShowBudgetModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium">Send to Finance</button>
               </div>
             </form>
           </div>
