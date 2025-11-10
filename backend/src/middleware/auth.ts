@@ -51,14 +51,19 @@ export const authenticate = async (
   next: NextFunction
 ): Promise<void> => {
   try {
-    // Get token from header
+    // Get token from header or query parameter (for PDF viewing in new tab)
     const authHeader = req.headers.authorization;
+    let token: string | undefined;
     
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      token = authHeader.substring(7);
+    } else if (req.query.token && typeof req.query.token === 'string') {
+      token = req.query.token;
+    }
+    
+    if (!token) {
       throw new AuthenticationError('No token provided');
     }
-
-    const token = authHeader.substring(7);
     
     // Verify token
     const decoded = verifyToken(token);

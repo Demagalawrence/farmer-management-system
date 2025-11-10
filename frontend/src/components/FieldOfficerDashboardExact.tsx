@@ -1,9 +1,11 @@
 import React, { useState } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
-import { MapPin, UserPlus, X } from 'lucide-react';
+import { MapPin, UserPlus, X, Sun, Bell } from 'lucide-react';
 import { useWallpaper } from '../contexts/WallpaperContext';
 import { useAuth } from '../contexts/AuthContext';
 import WallpaperGallery from './WallpaperGallery';
+import NotificationBell from './NotificationBell';
+import UserProfileDropdown from './UserProfileDropdown';
 import { farmerService } from '../services/farmerService';
 import { fieldService } from '../services/fieldService';
 import { harvestService } from '../services/harvestService';
@@ -11,8 +13,11 @@ import { reportService } from '../services/reportService';
 import { paymentService } from '../services/paymentService';
 import FieldGoogleMap from './FieldGoogleMap';
 import AddLocationModal from './AddLocationModal';
+import RecordCropDataModal from './RecordCropDataModal';
+import { useToast } from './Toast';
 
 const FieldOfficerDashboard: React.FC = () => {
+  const { showToast, ToastComponent } = useToast();
   // Add premium CSS animations
   React.useEffect(() => {
     const style = document.createElement('style');
@@ -46,38 +51,43 @@ const FieldOfficerDashboard: React.FC = () => {
     setActionError('');
     setActionMessage('');
     try {
-      // Basic validations
-      const isHexId = (v: string) => /^[a-fA-F0-9]{24}$/.test(v);
-      const isNumericId = (v: string) => /^\d+$/.test(v);
-      if (!(isHexId(fieldForm.farmer_id) || isNumericId(fieldForm.farmer_id))) {
-        setActionError('Invalid Farmer ID. Enter numeric external ID (e.g., 1) or a 24-character ObjectId.');
+      if (!fieldForm.field_id) {
+        setActionError('Please select a field');
         return;
       }
-      const size = parseFloat(fieldForm.size_hectares);
-      if (Number.isNaN(size) || size <= 0) {
-        setActionError('Size (hectares) must be a positive number.');
+      
+      if (!fieldForm.observations.trim()) {
+        setActionError('Please enter your observations');
         return;
       }
-      await fieldService.createField({
-        farmer_id: fieldForm.farmer_id as unknown as any,
-        location: fieldForm.location,
-        size_hectares: size,
-        crop_stage: fieldForm.crop_stage,
-        health_status: fieldForm.health_status,
-      } as any);
-      // Refresh fields and derived counts
-      const flds = await fieldService.getAllFields();
-      const fldArr = Array.isArray(flds) ? flds : (flds?.items || flds?.data || []);
-      setFields(fldArr);
-      const active = fldArr.filter((x: any) => x.health_status === 'healthy' || x.health_status === 'needs_attention').length;
-      const needs = fldArr.filter((x: any) => x.health_status === 'needs_attention').length;
-      setActiveFields(active);
-      setNeedsAttentionFields(needs);
-      setActionMessage('✅ Field data recorded');
+      
+      // TODO: Create field visit log API endpoint
+      // await fieldService.createFieldVisitLog({
+      //   field_id: fieldForm.field_id,
+      //   visit_date: fieldForm.visit_date,
+      //   observation_type: fieldForm.observation_type,
+      //   field_condition: fieldForm.field_condition,
+      //   observations: fieldForm.observations,
+      //   infrastructure_notes: fieldForm.infrastructure_notes,
+      //   maintenance_required: fieldForm.maintenance_required,
+      //   priority: fieldForm.priority,
+      //   recorded_by: (user as any)?._id || (user as any)?.id
+      // });
+      
+      setActionMessage('✅ Field condition logged successfully');
       setShowFieldModal(false);
-      setFieldForm({ farmer_id: '', location: '', size_hectares: '', crop_stage: 'planting', health_status: 'healthy' });
+      setFieldForm({
+        field_id: '',
+        visit_date: new Date().toISOString().split('T')[0],
+        observation_type: 'general',
+        field_condition: 'good',
+        observations: '',
+        infrastructure_notes: '',
+        maintenance_required: false,
+        priority: 'low'
+      });
     } catch (err) {
-      setActionError('Failed to record field data');
+      setActionError('Failed to log field visit');
     }
   };
 
@@ -166,35 +176,6 @@ const FieldOfficerDashboard: React.FC = () => {
     }
   };
 
-  // Create Field (record field data)
-  const handleCreateField = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setActionError('');
-    setActionMessage('');
-    try {
-      await fieldService.createField({
-        farmer_id: fieldForm.farmer_id as unknown as any,
-        location: fieldForm.location,
-        size_hectares: parseFloat(fieldForm.size_hectares),
-        crop_stage: fieldForm.crop_stage,
-        health_status: fieldForm.health_status,
-      } as any);
-      // Refresh fields and derived counts
-      const flds = await fieldService.getAllFields();
-      const fldArr = Array.isArray(flds) ? flds : (flds?.items || flds?.data || []);
-      setFields(fldArr);
-      const active = fldArr.filter((x: any) => x.health_status === 'healthy' || x.health_status === 'needs_attention').length;
-      const needs = fldArr.filter((x: any) => x.health_status === 'needs_attention').length;
-      setActiveFields(active);
-      setNeedsAttentionFields(needs);
-      setActionMessage('✅ Field data recorded');
-      setShowFieldModal(false);
-      setFieldForm({ farmer_id: '', location: '', size_hectares: '', crop_stage: 'planting', health_status: 'healthy' });
-    } catch (err) {
-      setActionError('Failed to record field data');
-    }
-  };
-
   // Generate Report and send to Manager
   const handleCreateReport = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -251,7 +232,6 @@ const FieldOfficerDashboard: React.FC = () => {
     email: '',
     phone: '',
     address: '',
-    farm_size: '',
     external_id: ''
   });
   const [registerError, setRegisterError] = useState('');
@@ -284,11 +264,14 @@ const FieldOfficerDashboard: React.FC = () => {
 
   // Forms
   const [fieldForm, setFieldForm] = useState({
-    farmer_id: '',
-    location: '',
-    size_hectares: '',
-    crop_stage: 'planting' as 'planting' | 'growing' | 'mature' | 'harvest_ready',
-    health_status: 'healthy' as 'healthy' | 'needs_attention' | 'critical'
+    field_id: '',
+    visit_date: new Date().toISOString().split('T')[0],
+    observation_type: 'general' as 'general' | 'infrastructure' | 'soil_test' | 'weather_damage' | 'maintenance',
+    field_condition: 'good' as 'excellent' | 'good' | 'fair' | 'poor',
+    observations: '',
+    infrastructure_notes: '',
+    maintenance_required: false,
+    priority: 'low' as 'low' | 'medium' | 'high' | 'urgent'
   });
   const [harvestForm, setHarvestForm] = useState({
     field_id: '',
@@ -499,12 +482,11 @@ const FieldOfficerDashboard: React.FC = () => {
 
     try {
       // Create farmer directly as an entity (no user account)
-      const farmerData: any = {
+      const farmerData = {
         name: registerForm.name,
         email: registerForm.email,
         phone: registerForm.phone,
         address: registerForm.address,
-        farm_size: parseFloat(registerForm.farm_size),
         status: 'active'
       };
 
@@ -525,7 +507,6 @@ const FieldOfficerDashboard: React.FC = () => {
         email: '',
         phone: '',
         address: '',
-        farm_size: '',
         external_id: ''
       });
       
@@ -548,63 +529,65 @@ const FieldOfficerDashboard: React.FC = () => {
       <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
       }}></div>
-      {/* Premium Header */}
-      <div className="bg-white/95 backdrop-blur-md shadow-xl border-b border-gray-200/50 relative z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            {/* Left side - Logo and title */}
+      {/* Premium Gradient Header - Matching Financial Manager Style */}
+      <nav className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-[#6B2C91] via-[#9932CC] to-[#E85D75] shadow-lg">
+        <div className="w-full px-6 py-3">
+          <div className="flex items-center justify-between">
+            {/* Left Section - Logo and Title */}
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">🌾</span>
+              {/* Logo */}
+              <div className="flex-shrink-0">
+                <div className="w-14 h-14 rounded-full border-2 border-white bg-white/10 flex items-center justify-center backdrop-blur-sm">
+                  <span className="text-3xl">🌾</span>
                 </div>
-
-      {/* Removed hover zone */}
-
-                <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
-                <span className="text-sm text-gray-500">System</span>
+              </div>
+              
+              {/* Title */}
+              <div className="flex flex-col">
+                <h1 className="text-xl font-bold text-white leading-tight">Field Officer Portal</h1>
+                <p className="text-xs text-white/80">Farm Management System</p>
               </div>
             </div>
             
-            {/* Right side - Weather, notifications, logout */}
-            <div className="flex items-center space-x-4">
-              {/* Weather widget - EXACT from your image */}
-              <div className="flex items-center space-x-2 bg-yellow-100 px-3 py-2 rounded-lg">
-                <span className="text-lg">☀️</span>
-                <span className="text-sm font-medium">24°C</span>
-                <span className="text-xs text-gray-600">Today is partly sunny day!</span>
+            {/* Right Section - Utilities */}
+            <div className="flex items-center space-x-1">
+              {/* Weather */}
+              <div className="flex items-center space-x-2 bg-white/10 backdrop-blur-sm px-4 py-2 rounded-lg border border-white/20">
+                <Sun className="w-5 h-5 text-yellow-300" />
+                <div className="flex flex-col">
+                  <span className="text-sm font-semibold text-white">24°C</span>
+                  <span className="text-xs text-white/80">Partly sunny</span>
+                </div>
               </div>
               
-              {/* Wallpaper button */}
-              <button 
+              {/* Wallpaper */}
+              <button
                 onClick={() => setShowWallpaperGallery(true)}
-                className="p-2 bg-purple-100 hover:bg-purple-200 rounded-lg transition-colors"
+                className="flex flex-col items-center space-y-1 text-white hover:bg-white/20 rounded-lg px-3 py-2 transition-all duration-200 group"
                 title="Change Wallpaper"
               >
-                <span className="text-lg">🎨</span>
+                <span className="text-xl group-hover:scale-110 transition-transform">🎨</span>
+                <span className="text-xs font-medium">Theme</span>
               </button>
               
               {/* Notifications */}
-              <button className="p-2 bg-gray-100 rounded-lg relative">
-                <span className="text-lg">🔔</span>
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-              </button>
+              <div className="flex flex-col items-center space-y-1">
+                <NotificationBell />
+                <span className="text-xs font-medium text-white">Notifications</span>
+              </div>
               
-              {/* User profile */}
-              <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
-              
-              {/* Logout button */}
-              <button 
-                onClick={logout}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 font-medium shadow-lg hover:shadow-xl"
-                title="Logout"
-              >
-                🚪 Logout
-              </button>
+              {/* User Profile Dropdown */}
+              <UserProfileDropdown
+                userName={user?.name || 'Field Officer'}
+                onLogout={logout}
+              />
             </div>
           </div>
         </div>
-      </div>
+      </nav>
+
+      {/* Add top padding to account for fixed header */}
+      <div className="pt-20"></div>
 
       <div className="w-full px-0 pt-0 pb-6">
         {/* EXACT Layout from your image */}
@@ -637,8 +620,8 @@ const FieldOfficerDashboard: React.FC = () => {
                 onClick={() => setShowFieldModal(true)}
                 className="w-full mt-2 flex items-center space-x-3 bg-green-500 hover:bg-green-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
-                <span className="text-sm">📍</span>
-                <span className="font-medium">Record Field Data</span>
+                <span className="text-sm">📋</span>
+                <span className="font-medium">Field Condition Log</span>
               </button>
               <button 
                 onClick={() => setShowHarvestModal(true)}
@@ -1011,21 +994,6 @@ const FieldOfficerDashboard: React.FC = () => {
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Farm Size (acres) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  step="0.1"
-                  min="0"
-                  value={registerForm.farm_size}
-                  onChange={(e) => setRegisterForm({ ...registerForm, farm_size: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., 50.5"
-                />
-              </div>
 
               {registerSuccess && (
                 <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
@@ -1062,67 +1030,213 @@ const FieldOfficerDashboard: React.FC = () => {
         </div>
       )}
 
-      {/* Record Field Data Modal */}
+      {/* Field Condition Log Modal */}
       {showFieldModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto relative z-[10000]">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">📍 Record Field Data</h2>
-              <button onClick={() => setShowFieldModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999] p-4">
+          <div className="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[95vh] overflow-y-auto">
+            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 flex justify-between items-center rounded-t-2xl z-10">
+              <div>
+                <h2 className="text-2xl font-bold text-gray-800">📋 Field Condition Log</h2>
+                <p className="text-sm text-gray-600 mt-1">Record field observations, infrastructure, and maintenance needs</p>
+              </div>
+              <button onClick={() => setShowFieldModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-6 h-6"/>
+              </button>
             </div>
-            <form onSubmit={submitFieldData} className="space-y-4">
-              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Farmer ID" value={fieldForm.farmer_id} onChange={(e)=>setFieldForm({...fieldForm, farmer_id: e.target.value})} required />
-              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Location" value={fieldForm.location} onChange={(e)=>setFieldForm({...fieldForm, location: e.target.value})} required />
-              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Size (hectares)" value={fieldForm.size_hectares} onChange={(e)=>setFieldForm({...fieldForm, size_hectares: e.target.value})} required />
-              <select className="w-full px-4 py-2 border rounded-lg" value={fieldForm.crop_stage} onChange={(e)=>setFieldForm({...fieldForm, crop_stage: e.target.value as any})}>
-                <option value="planting">Planting</option>
-                <option value="growing">Growing</option>
-                <option value="mature">Mature</option>
-                <option value="harvest_ready">Harvest Ready</option>
-              </select>
-              <select className="w-full px-4 py-2 border rounded-lg" value={fieldForm.health_status} onChange={(e)=>setFieldForm({...fieldForm, health_status: e.target.value as any})}>
-                <option value="healthy">Healthy</option>
-                <option value="needs_attention">Needs Attention</option>
-                <option value="critical">Critical</option>
-              </select>
-              {actionError && <p className="text-sm text-red-600">{actionError}</p>}
-              {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
-              <div className="flex space-x-3 pt-2">
-                <button type="button" onClick={()=>setShowFieldModal(false)} className="flex-1 px-4 py-3 border rounded-lg">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-green-600 text-white rounded-lg">Save</button>
+            
+            <form onSubmit={submitFieldData} className="p-6 space-y-6">
+              {/* Basic Info */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Visit Information</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Field *
+                    </label>
+                    <select
+                      required
+                      value={fieldForm.field_id}
+                      onChange={(e) => setFieldForm({...fieldForm, field_id: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="">Select field</option>
+                      {fields.map((field: any) => (
+                        <option key={field._id} value={field._id}>
+                          {field.field_name || field.name || field.location || `Field ${field._id}`}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Visit Date *
+                    </label>
+                    <input
+                      type="date"
+                      required
+                      value={fieldForm.visit_date}
+                      onChange={(e) => setFieldForm({...fieldForm, visit_date: e.target.value})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    />
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Observation Type *
+                    </label>
+                    <select
+                      value={fieldForm.observation_type}
+                      onChange={(e) => setFieldForm({...fieldForm, observation_type: e.target.value as any})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="general">General Inspection</option>
+                      <option value="infrastructure">Infrastructure Check</option>
+                      <option value="soil_test">Soil Testing</option>
+                      <option value="weather_damage">Weather Damage Assessment</option>
+                      <option value="maintenance">Maintenance Visit</option>
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Overall Field Condition *
+                    </label>
+                    <select
+                      value={fieldForm.field_condition}
+                      onChange={(e) => setFieldForm({...fieldForm, field_condition: e.target.value as any})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="excellent">Excellent</option>
+                      <option value="good">Good</option>
+                      <option value="fair">Fair</option>
+                      <option value="poor">Poor</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+              
+              {/* Observations */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Observations</h3>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    General Observations *
+                  </label>
+                  <textarea
+                    required
+                    rows={4}
+                    value={fieldForm.observations}
+                    onChange={(e) => setFieldForm({...fieldForm, observations: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Describe what you observed during the field visit..."
+                  />
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">
+                    Infrastructure / Equipment Notes
+                  </label>
+                  <textarea
+                    rows={3}
+                    value={fieldForm.infrastructure_notes}
+                    onChange={(e) => setFieldForm({...fieldForm, infrastructure_notes: e.target.value})}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    placeholder="Notes on fences, irrigation, drainage, storage, etc."
+                  />
+                </div>
+              </div>
+              
+              {/* Action Required */}
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-gray-800 border-b pb-2">Action Required</h3>
+                
+                <div className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    id="maintenance"
+                    checked={fieldForm.maintenance_required}
+                    onChange={(e) => setFieldForm({...fieldForm, maintenance_required: e.target.checked})}
+                    className="w-4 h-4 text-green-600 border-gray-300 rounded focus:ring-green-500"
+                  />
+                  <label htmlFor="maintenance" className="text-sm font-medium text-gray-700">
+                    Maintenance / Follow-up Required
+                  </label>
+                </div>
+                
+                {fieldForm.maintenance_required && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-1">
+                      Priority Level
+                    </label>
+                    <select
+                      value={fieldForm.priority}
+                      onChange={(e) => setFieldForm({...fieldForm, priority: e.target.value as any})}
+                      className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
+                    >
+                      <option value="low">Low (Can wait)</option>
+                      <option value="medium">Medium (Within 2 weeks)</option>
+                      <option value="high">High (Within 1 week)</option>
+                      <option value="urgent">Urgent (Immediate action)</option>
+                    </select>
+                  </div>
+                )}
+              </div>
+              
+              {/* Messages */}
+              {actionError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
+                  {actionError}
+                </div>
+              )}
+              {actionMessage && (
+                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg flex items-center">
+                  <svg className="w-5 h-5 mr-2" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                  </svg>
+                  {actionMessage}
+                </div>
+              )}
+              
+              {/* Action Buttons */}
+              <div className="flex space-x-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setShowFieldModal(false)}
+                  className="flex-1 px-4 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="flex-1 px-4 py-3 bg-gradient-to-r from-green-500 to-emerald-600 text-white rounded-lg hover:shadow-lg transition-all font-semibold"
+                >
+                  Log Field Visit
+                </button>
               </div>
             </form>
           </div>
         </div>
       )}
 
-      {/* Record Crop Data Modal */}
-      {showHarvestModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto relative z-[10000]">
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">🌾 Record Crop Data</h2>
-              <button onClick={() => setShowHarvestModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
-            </div>
-            <form onSubmit={submitHarvestData} className="space-y-4">
-              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Field ID" value={harvestForm.field_id} onChange={(e)=>setHarvestForm({...harvestForm, field_id: e.target.value})} required />
-              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Farmer ID" value={harvestForm.farmer_id} onChange={(e)=>setHarvestForm({...harvestForm, farmer_id: e.target.value})} required />
-              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Quantity (tons)" value={harvestForm.quantity_tons} onChange={(e)=>setHarvestForm({...harvestForm, quantity_tons: e.target.value})} required />
-              <select className="w-full px-4 py-2 border rounded-lg" value={harvestForm.quality_grade} onChange={(e)=>setHarvestForm({...harvestForm, quality_grade: e.target.value as any})}>
-                <option value="A">A</option>
-                <option value="B">B</option>
-                <option value="C">C</option>
-              </select>
-              {actionError && <p className="text-sm text-red-600">{actionError}</p>}
-              {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
-              <div className="flex space-x-3 pt-2">
-                <button type="button" onClick={()=>setShowHarvestModal(false)} className="flex-1 px-4 py-3 border rounded-lg">Cancel</button>
-                <button type="submit" className="flex-1 px-4 py-3 bg-emerald-600 text-white rounded-lg">Save</button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      {/* Record Crop Data Modal - NEW ADVANCED VERSION */}
+      <RecordCropDataModal 
+        isOpen={showHarvestModal}
+        onClose={() => setShowHarvestModal(false)}
+        onSuccess={(message) => {
+          showToast(message, 'success');
+          setActionMessage(message);
+          // Optionally refresh data here
+          setTimeout(() => setActionMessage(''), 3000);
+        }}
+      />
+
+      {/* Toast Notifications */}
+      {ToastComponent}
 
       {/* Generate Report Modal */}
       {showReportModal && (

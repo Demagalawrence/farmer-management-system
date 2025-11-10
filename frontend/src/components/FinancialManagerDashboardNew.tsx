@@ -5,21 +5,19 @@ import { useAuth } from '../contexts/AuthContext';
 import { paymentService } from '../services/paymentService';
 import { farmerService } from '../services/farmerService';
 import { formatUGX } from '../utils/currency';
+import TopNavigationBar from './TopNavigationBar';
+import ReportDistributionModal from './ReportDistributionModal';
+import { useToast } from './Toast';
 
 const FinancialManagerDashboard: React.FC = () => {
-  const { logout } = useAuth();
-  const [approvedPayments, setApprovedPayments] = React.useState<any[]>([]);
+  const { logout, user } = useAuth();
+  const { showToast, ToastComponent } = useToast();
   const [allPayments, setAllPayments] = React.useState<any[]>([]);
   const [apLoading, setApLoading] = React.useState(false);
   const [apError, setApError] = React.useState('');
-  const approvedRef = React.useRef<HTMLDivElement | null>(null);
+  const pendingRef = React.useRef<HTMLDivElement | null>(null);
   const [farmers, setFarmers] = React.useState<any[]>([]);
-  const [processing, setProcessing] = React.useState(false);
-  const [showProcessModal, setShowProcessModal] = React.useState(false);
-  const [selectedPayment, setSelectedPayment] = React.useState<any | null>(null);
-  const [payMethod, setPayMethod] = React.useState<'cash' | 'bank_transfer' | 'mobile_money' | 'check'>('bank_transfer');
-  const [payRef, setPayRef] = React.useState('');
-  const [highlightApproved, setHighlightApproved] = React.useState(false);
+  const [showReportModal, setShowReportModal] = React.useState(false);
 
   // Helpers and derived finance statistics
   const currency = (n: number) => formatUGX(n);
@@ -29,15 +27,16 @@ const FinancialManagerDashboard: React.FC = () => {
       .reduce((sum, p) => sum + Number(p.amount || 0), 0)
   , [allPayments]);
   const pendingCount = React.useMemo(() => allPayments.filter((p) => p.status === 'pending').length, [allPayments]);
-  const approvedCount = React.useMemo(() => approvedPayments.length, [approvedPayments]);
+  const approvedCount = React.useMemo(() => allPayments.filter((p) => p.status === 'approved').length, [allPayments]);
   const paidCount = React.useMemo(() => allPayments.filter((p) => p.status === 'paid').length, [allPayments]);
   const farmersCount = React.useMemo(() => farmers.length, [farmers]);
 
   const renderStatusBadge = (s: string) => {
-    const base = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium';
-    if (s === 'pending') return <span className={`${base} bg-yellow-100 text-yellow-800`}>Pending</span>;
-    if (s === 'approved') return <span className={`${base} bg-blue-100 text-blue-800`}>Verified</span>;
-    if (s === 'paid') return <span className={`${base} bg-green-100 text-green-800`}>Paid</span>;
+    const base = 'inline-flex items-center px-3 py-1.5 rounded-full text-xs font-semibold uppercase tracking-wide';
+    if (s === 'pending') return <span className={`${base} bg-yellow-100 text-yellow-800`}>PENDING</span>;
+    if (s === 'approved') return <span className={`${base} bg-blue-100 text-blue-800`}>APPROVED</span>;
+    if (s === 'paid') return <span className={`${base} bg-green-100 text-green-800`}>PAID</span>;
+    if (s === 'rejected') return <span className={`${base} bg-red-100 text-red-800`}>REJECTED</span>;
     return <span className={`${base} bg-gray-100 text-gray-700`}>—</span>;
   };
 
@@ -54,7 +53,6 @@ const FinancialManagerDashboard: React.FC = () => {
         if (!mounted) return;
         const all = Array.isArray(allPays?.data) ? allPays.data : (Array.isArray(allPays) ? allPays : []);
         setAllPayments(all);
-        setApprovedPayments(all.filter((p: any) => p.status === 'approved'));
         setFarmers(farmersRes?.data || []);
       } catch (e) {
         if (!mounted) return;
@@ -67,37 +65,16 @@ const FinancialManagerDashboard: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
-  const markPaid = async (id: string) => {
-    try {
-      setProcessing(true);
-      await paymentService.updatePayment(id, { status: 'paid', payment_date: new Date() as any });
-      setApprovedPayments((prev) => prev.filter((p) => (p._id || p.id) !== id));
-      setShowProcessModal(false);
-      setSelectedPayment(null);
-      setPayRef('');
-      alert('Payment marked as paid. Manager will be notified.');
-    } catch (e) {
-      setApError('Failed to mark as paid');
-    } finally {
-      setProcessing(false);
-    }
-  };
-  const openProcess = (payment: any) => {
-    setSelectedPayment(payment);
-    setShowProcessModal(true);
-  };
   const approvePending = async (id: string) => {
     try {
       await paymentService.updatePayment(id, { status: 'approved' } as any);
-      // Update both states from the same updated array to avoid staleness and lints
-      setAllPayments((prev) => {
-        const updated = prev.map((p) => (String(p._id || p.id) === id ? { ...p, status: 'approved' } : p));
-        setApprovedPayments(updated.filter((p) => p.status === 'approved'));
-        return updated;
-      });
-      alert('Payment approved');
+      // Update state to reflect approval
+      setAllPayments((prev) => 
+        prev.map((p) => (String(p._id || p.id) === id ? { ...p, status: 'approved' } : p))
+      );
+      showToast('✅ Payment approved and sent to Manager for processing', 'success');
     } catch (e) {
-      alert('Failed to approve payment');
+      showToast('❌ Failed to approve payment', 'error');
     }
   };
   const handleGenerateInvoice = () => {
@@ -105,17 +82,11 @@ const FinancialManagerDashboard: React.FC = () => {
     alert('Generate Invoice: This feature will open the invoice creation flow.');
   };
   const handleFinancialReport = () => {
-    // TODO: Implement report generation/navigation
-    alert('Financial Report: This will open the reporting module.');
+    setShowReportModal(true);
   };
-  const handleProcessPayments = () => {
-    if (!approvedPayments || approvedPayments.length === 0) {
-      alert('No approved payments to process yet. Approve a request first.');
-      return;
-    }
-    approvedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setHighlightApproved(true);
-    setTimeout(() => setHighlightApproved(false), 1500);
+
+  const handlePendingClick = () => {
+    pendingRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   };
   const handleBudgetPlanning = () => {
     // TODO: Implement budget planning navigation/modal
@@ -203,69 +174,19 @@ const FinancialManagerDashboard: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">🌾</span>
-                </div>
+      {/* Top Navigation Bar */}
+      <TopNavigationBar 
+        userName={user?.name || 'Buayism'}
+        onReportsClick={handleFinancialReport}
+        onNotificationsClick={() => alert('Notifications')}
+        onProfileClick={logout}
+        onPendingClick={handlePendingClick}
+        pendingCount={pendingCount}
+      />
 
-            {/* Approved Payments to Process */}
-            <div ref={approvedRef} className={`bg-white rounded-lg shadow-sm p-6 ${highlightApproved ? 'ring-2 ring-purple-400' : ''}` }>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Approved Payments</h2>
-                {apLoading && <span className="text-sm text-gray-500">Loading...</span>}
-              </div>
-              {apError && <p className="text-sm text-red-600 mb-3">{apError}</p>}
-              {approvedPayments.length === 0 && !apLoading ? (
-                <p className="text-sm text-gray-600">No approved payments to process.</p>
-              ) : (
-                <div className="space-y-3">
-                  {approvedPayments.slice(0,6).map((p) => {
-                    const f = farmers.find((x) => String(x._id) === String(p.farmer_id));
-                    return (
-                      <div key={(p._id || p.id) as string} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="text-sm text-gray-800">
-                          <div className="font-medium">{f?.name || f?.full_name || f?.first_name || 'Farmer'} <span className="text-gray-500">({String(p.farmer_id)})</span></div>
-                          <div className="text-gray-600">Amount: {formatUGX(Number(p.amount))}</div>
-                        </div>
-                        <button
-                          onClick={() => openProcess(p)}
-                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm"
-                        >
-                          Process
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-                <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
-                <span className="text-sm text-gray-500">System</span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-900">Financial Dashboard</h1>
-              <button className="p-2 bg-gray-100 rounded-lg">
-                <span className="text-lg">🔔</span>
-              </button>
-              <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
-              {/* Logout Button */}
-              <button 
-                onClick={logout}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 font-medium shadow-lg hover:shadow-xl"
-                title="Logout"
-              >
-                🚪 Logout
-              </button>
-            </div>
-          </div>
-        </div>
-
+      {/* Main Content - Add padding-top to account for fixed navbar */}
+      <div className="pt-20">
+      
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
         {/* Financial KPIs */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
@@ -321,29 +242,33 @@ const FinancialManagerDashboard: React.FC = () => {
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Farmers Payment Overview */}
-          <div className="lg:col-span-3 bg-white rounded-lg shadow-sm p-6">
+          <div ref={pendingRef} className="lg:col-span-3 bg-white rounded-lg shadow-sm p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Farmers Payment Overview</h2>
               <span className="text-sm text-gray-500">Summary of dues and statuses</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm border rounded-lg overflow-hidden">
+            <div className="overflow-x-auto border border-gray-200 rounded-lg">
+              <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="text-left text-gray-600 bg-gray-50 border-b">
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Farmer Name / ID</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Total Amount Due</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Last Payment Date</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Payment Status</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Bank/Mobile Money Details</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Actions</th>
+                  <tr className="bg-gradient-to-r from-[#7C3AED] to-[#9333EA]">
+                    <th className="py-4 px-6 text-left text-white text-sm font-semibold uppercase tracking-wider">Farmer Name / ID</th>
+                    <th className="py-4 px-6 text-left text-white text-sm font-semibold uppercase tracking-wider">Total Amount Due</th>
+                    <th className="py-4 px-6 text-left text-white text-sm font-semibold uppercase tracking-wider">Last Payment Date</th>
+                    <th className="py-4 px-6 text-left text-white text-sm font-semibold uppercase tracking-wider">Payment Status</th>
+                    <th className="py-4 px-6 text-left text-white text-sm font-semibold uppercase tracking-wider">Amount Paid</th>
+                    <th className="py-4 px-6 text-left text-white text-sm font-semibold uppercase tracking-wider">Bank/Mobile Money Details</th>
+                    <th className="py-4 px-6 text-left text-white text-sm font-semibold uppercase tracking-wider">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {farmers.map((f) => {
+                  {farmers.map((f, index) => {
                     const fId = String(f._id);
                     const pays = allPayments.filter((p) => String(p.farmer_id) === fId);
                     const totalDue = pays
                       .filter((p) => p.status === 'pending' || p.status === 'approved')
+                      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+                    const totalPaid = pays
+                      .filter((p) => p.status === 'paid')
                       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
                     const paidDates = pays
                       .filter((p) => p.status === 'paid' && p.payment_date)
@@ -351,30 +276,32 @@ const FinancialManagerDashboard: React.FC = () => {
                     const lastPaid = paidDates.length ? new Date(Math.max.apply(null, paidDates as any)) : null;
                     const hasPending = pays.some((p) => p.status === 'pending');
                     const hasApproved = pays.some((p) => p.status === 'approved');
-                    const status = hasPending ? 'Pending' : hasApproved ? 'Verified' : (pays.some((p) => p.status === 'paid') ? 'Paid' : '—');
+                    const hasPaid = pays.some((p) => p.status === 'paid');
+                    const status = hasPending ? 'Pending' : hasApproved ? 'Verified' : (hasPaid ? 'Paid' : '—');
                     const pendingForFarmer = pays.filter((p) => p.status === 'pending');
                     return (
-                      <tr key={fId} className="border-t even:bg-gray-50/50 hover:bg-gray-50">
-                        <td className="py-2 pr-4 font-medium text-gray-900">{f.name || 'Farmer'} <span className="text-gray-500">({fId})</span></td>
-                        <td className="py-2 pr-4">{currency(totalDue)}</td>
-                        <td className="py-2 pr-4">{lastPaid ? lastPaid.toLocaleDateString() : '—'}</td>
-                        <td className="py-2 pr-4">{renderStatusBadge(status.toLowerCase())}</td>
-                        <td className="py-2 pr-4">{f.contact || '—'}</td>
-                        <td className="py-2 pr-4">
+                      <tr key={fId} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                        <td className="py-4 px-6 font-medium text-gray-900">{f.name || 'Farmer'} <span className="text-gray-500 text-xs">({fId.substring(0, 8)}...)</span></td>
+                        <td className="py-4 px-6 text-gray-700">{currency(totalDue)}</td>
+                        <td className="py-4 px-6 text-gray-700">{lastPaid ? lastPaid.toLocaleDateString() : '—'}</td>
+                        <td className="py-4 px-6">{renderStatusBadge(status.toLowerCase())}</td>
+                        <td className="py-4 px-6 font-semibold text-gray-900">{hasPaid ? currency(totalPaid) : '—'}</td>
+                        <td className="py-4 px-6 text-gray-700">{f.contact || '—'}</td>
+                        <td className="py-4 px-6">
                           {pendingForFarmer.length > 0 ? (
                             <div className="space-y-1">
-                              {pendingForFarmer.slice(0,3).map((p) => (
-                                <div key={String(p._id)} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 border">
-                                  <span>Req: {currency(Number(p.amount))}</span>
-                                  <button onClick={() => approvePending(String(p._id || p.id))} className="px-2 py-0.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs">Approve</button>
+                              {pendingForFarmer.slice(0,2).map((p) => (
+                                <div key={String(p._id)} className="flex items-center gap-2">
+                                  <span className="text-sm text-gray-600">{currency(Number(p.amount))}</span>
+                                  <button onClick={() => approvePending(String(p._id || p.id))} className="px-3 py-1 bg-[#7C3AED] hover:bg-[#6D28D9] text-white rounded text-xs font-medium transition-colors">Approve</button>
                                 </div>
                               ))}
-                              {pendingForFarmer.length > 3 && (
-                                <div className="text-xs text-gray-500">+{pendingForFarmer.length - 3} more</div>
+                              {pendingForFarmer.length > 2 && (
+                                <div className="text-xs text-gray-500">+{pendingForFarmer.length - 2} more</div>
                               )}
                             </div>
                           ) : (
-                            <span className="text-xs text-gray-500">No pending requests</span>
+                            <span className="text-sm text-gray-400">—</span>
                           )}
                         </td>
                       </tr>
@@ -382,7 +309,7 @@ const FinancialManagerDashboard: React.FC = () => {
                   })}
                   {farmers.length === 0 && (
                     <tr>
-                      <td className="py-4 text-gray-500" colSpan={6}>No farmers found</td>
+                      <td className="py-8 px-6 text-gray-400 text-center text-sm" colSpan={7}>No farmers found</td>
                     </tr>
                   )}
                 </tbody>
@@ -395,7 +322,7 @@ const FinancialManagerDashboard: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold">Revenue & Profit Trends</h2>
-                <select className="text-sm border border-gray-300 rounded px-3 py-1">
+                <select className="text-sm border border-gray-300 rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-fm-primary focus:border-transparent">
                   <option>Last 12 Months</option>
                   <option>Last 6 Months</option>
                   <option>Last 3 Months</option>
@@ -412,7 +339,7 @@ const FinancialManagerDashboard: React.FC = () => {
                     <Line 
                       type="monotone" 
                       dataKey="revenue" 
-                      stroke="#3b82f6" 
+                      stroke="#0369A1" 
                       strokeWidth={3}
                       name="Revenue"
                     />
@@ -436,7 +363,7 @@ const FinancialManagerDashboard: React.FC = () => {
 
               <div className="flex justify-center space-x-6 mt-4">
                 <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
+                  <div className="w-3 h-3 rounded-full bg-fm-primary"></div>
                   <span className="text-sm">Revenue</span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -491,7 +418,7 @@ const FinancialManagerDashboard: React.FC = () => {
                     <XAxis dataKey="crop" />
                     <YAxis />
                     <Tooltip formatter={(value) => [`${value}%`, 'ROI']} />
-                    <Bar dataKey="roi" fill="#22c55e" name="ROI %" />
+                    <Bar dataKey="roi" fill="#0369A1" name="ROI %" />
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -586,25 +513,19 @@ const FinancialManagerDashboard: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold mb-6">Quick Actions</h2>
               <div className="space-y-3">
-                <button onClick={handleGenerateInvoice} className="w-full p-3 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors text-left">
+                <button onClick={handleGenerateInvoice} className="w-full p-3 bg-fm-secondary text-fm-primary rounded-lg hover:bg-fm-primary-light transition-colors text-left">
                   <div className="flex items-center space-x-3">
                     <DollarSign className="w-5 h-5" />
                     <span className="font-medium">Generate Invoice</span>
                   </div>
                 </button>
-                <button onClick={handleFinancialReport} className="w-full p-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors text-left">
+                <button onClick={handleFinancialReport} className="w-full p-3 bg-fm-secondary text-fm-primary rounded-lg hover:bg-fm-primary-light transition-colors text-left">
                   <div className="flex items-center space-x-3">
                     <PieChartIcon className="w-5 h-5" />
                     <span className="font-medium">Financial Report</span>
                   </div>
                 </button>
-                <button onClick={handleProcessPayments} className="w-full p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors text-left">
-                  <div className="flex items-center space-x-3">
-                    <CreditCard className="w-5 h-5" />
-                    <span className="font-medium">Process Payments</span>
-                  </div>
-                </button>
-                <button onClick={handleBudgetPlanning} className="w-full p-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors text-left">
+                <button onClick={handleBudgetPlanning} className="w-full p-3 bg-fm-secondary text-fm-primary rounded-lg hover:bg-fm-primary-light transition-colors text-left">
                   <div className="flex items-center space-x-3">
                     <TrendingUp className="w-5 h-5" />
                     <span className="font-medium">Budget Planning</span>
@@ -617,36 +538,14 @@ const FinancialManagerDashboard: React.FC = () => {
       </div>
       </div>
 
-      {showProcessModal && selectedPayment && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
-            <h3 className="text-lg font-semibold mb-4">Process Payment</h3>
-            <div className="space-y-3 text-sm">
-              <div className="flex justify-between"><span className="text-gray-600">Farmer ID</span><span className="font-medium">{String(selectedPayment.farmer_id)}</span></div>
-              <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-medium">{formatUGX(Number(selectedPayment.amount))}</span></div>
-              <div>
-                <label className="block text-gray-700 mb-1">Payment Method</label>
-                <select value={payMethod} onChange={(e) => setPayMethod(e.target.value as any)} className="w-full border rounded px-3 py-2">
-                  <option value="bank_transfer">Bank Transfer</option>
-                  <option value="mobile_money">Mobile Money</option>
-                  <option value="cash">Cash</option>
-                  <option value="check">Check</option>
-                </select>
-              </div>
-              <div>
-                <label className="block text-gray-700 mb-1">Reference (optional)</label>
-                <input value={payRef} onChange={(e) => setPayRef(e.target.value)} className="w-full border rounded px-3 py-2" placeholder="Txn ref / notes" />
-              </div>
-            </div>
-            <div className="flex justify-end space-x-2 mt-6">
-              <button onClick={() => { setShowProcessModal(false); setSelectedPayment(null); }} className="px-4 py-2 rounded bg-gray-200 text-gray-800">Cancel</button>
-              <button disabled={processing} onClick={() => markPaid(String(selectedPayment._id || selectedPayment.id))} className="px-4 py-2 rounded bg-purple-600 text-white disabled:opacity-60">
-                {processing ? 'Processing...' : 'Confirm Payment'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {/* Report Distribution Modal */}
+      <ReportDistributionModal 
+        isOpen={showReportModal}
+        onClose={() => setShowReportModal(false)}
+      />
+
+      {/* Toast Notifications */}
+      {ToastComponent}
     </div>
   );
 };

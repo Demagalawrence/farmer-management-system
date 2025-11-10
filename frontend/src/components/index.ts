@@ -7,3 +7,7 @@ export { default as WallpaperGallery } from './WallpaperGallery';
 export { default as AuthPage } from './AuthPage';
 export { default as Login } from './Login';
 export { default as Register } from './Register';
+export { default as TopNavigationBar } from './TopNavigationBar';
+export { default as UserProfileDropdown } from './UserProfileDropdown';
+export { default as NotificationBell } from './NotificationBell';
+export { default as ReportDistributionModal } from './ReportDistributionModal';

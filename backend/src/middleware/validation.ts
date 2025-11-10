@@ -126,11 +126,19 @@ export const schemas = {
     harvest_id: Joi.alternatives().try(
       Joi.string().pattern(/^[0-9a-fA-F]{24}$/),
       Joi.number().integer().positive()
-    ).required(),
+    ).optional(),
     amount: Joi.number().positive().required(),
+    payment_type: Joi.string().valid('advance', 'final', 'other').optional(),
+    description: Joi.string().max(500).optional(),
     category: Joi.string().valid('seeds','fertilizer','labor','equipment','utilities','maintenance','transport','other').optional(),
-    payment_method: Joi.string().valid('cash', 'bank_transfer', 'mobile_money', 'check').required(),
-    status: Joi.string().valid('pending', 'completed', 'failed').default('pending'),
+    payment_method: Joi.string().valid('cash', 'bank_transfer', 'mobile_money', 'check').optional(),
+    status: Joi.string().valid('pending', 'approved', 'rejected', 'paid', 'completed', 'failed').default('pending'),
+    calculation: Joi.object().optional(),
+    requested_by: Joi.alternatives().try(
+      Joi.string().pattern(/^[0-9a-fA-F]{24}$/),
+      Joi.any()
+    ).optional(),
+    requested_at: Joi.date().iso().optional(),
   }),
 
   updatePayment: Joi.object({
@@ -139,6 +147,7 @@ export const schemas = {
     payment_method: Joi.string().valid('cash', 'bank_transfer', 'mobile_money', 'check').optional(),
     status: Joi.string().valid('pending', 'approved', 'rejected', 'paid', 'completed', 'failed').optional(),
     payment_date: Joi.date().iso().optional(),
+    reference: Joi.string().max(200).optional(),
   }).min(1),
 
   // Report schemas

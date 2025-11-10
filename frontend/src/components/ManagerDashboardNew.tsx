@@ -2,6 +2,11 @@ import React from 'react';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { MapPin, TrendingUp, Users, DollarSign, Truck, Package } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import NotificationBell from './NotificationBell';
+import UserProfileDropdown from './UserProfileDropdown';
+import FieldGoogleMap from './FieldGoogleMap';
+import ProcessPaymentModal from './ProcessPaymentModal';
+import { useToast } from './Toast';
 import { paymentService } from '../services/paymentService';
 import { financeService } from '../services/financeService';
 import { harvestService } from '../services/harvestService';
@@ -9,7 +14,8 @@ import { farmerService } from '../services/farmerService';
 import { formatUGX } from '../utils/currency';
 
 const ManagerDashboard: React.FC = () => {
-  const { logout } = useAuth();
+  const { logout, user } = useAuth();
+  const { showToast, ToastComponent } = useToast();
   const [pendingPayments, setPendingPayments] = React.useState<any[]>([]);
   const [ppLoading, setPpLoading] = React.useState(false);
   const [ppError, setPpError] = React.useState('');
@@ -17,12 +23,16 @@ const ManagerDashboard: React.FC = () => {
   const [approvalsLoading, setApprovalsLoading] = React.useState(false);
   const [approvalsError, setApprovalsError] = React.useState('');
   const [allPayments, setAllPayments] = React.useState<any[]>([]);
+  const [approvedPayments, setApprovedPayments] = React.useState<any[]>([]);
   const [recentHarvests, setRecentHarvests] = React.useState<any[]>([]);
   const [ratesModalOpen, setRatesModalOpen] = React.useState(false);
   const [ratesLoading, setRatesLoading] = React.useState(false);
   const [ratesError, setRatesError] = React.useState('');
   const [ratesData, setRatesData] = React.useState<{ farmerId: string; totalQuantity: number; harvests: any[]; lastDate?: string } | null>(null);
   const [farmers, setFarmers] = React.useState<any[]>([]);
+  const [allFarmsModalOpen, setAllFarmsModalOpen] = React.useState(false);
+  const [processPaymentModalOpen, setProcessPaymentModalOpen] = React.useState(false);
+  const [selectedPayment, setSelectedPayment] = React.useState<any>(null);
 
   React.useEffect(() => {
     let mounted = true;
@@ -30,16 +40,21 @@ const ManagerDashboard: React.FC = () => {
       try {
         setPpLoading(true);
         setPpError('');
-        const [pendingRes, approvalsRes, allPaysRes, farmersRes, harvestsRes] = await Promise.all([
+        const [pendingRes, approvalsRes, approvedRes, allPaysRes, farmersRes, harvestsRes] = await Promise.all([
           paymentService.getPaymentsByStatus('pending'),
           financeService.getApprovalRequests('pending'),
+          paymentService.getPaymentsByStatus('approved'),
           paymentService.getAllPayments(),
           farmerService.getAllFarmers(),
           harvestService.getAllHarvests(),
         ]);
         if (!mounted) return;
-        setPendingPayments(Array.isArray(pendingRes) ? pendingRes : (pendingRes?.items || []));
+        console.log('📊 [Manager Dashboard] Approved payments response:', approvedRes);
+        const approvedData = Array.isArray(approvedRes) ? approvedRes : (approvedRes?.data || approvedRes?.items || []);
+        console.log('📊 [Manager Dashboard] Approved payments data:', approvedData);
+        setPendingPayments(Array.isArray(pendingRes) ? pendingRes : (pendingRes?.data || pendingRes?.items || []));
         setApprovals(approvalsRes?.data || approvalsRes || []);
+        setApprovedPayments(approvedData);
         setAllPayments(allPaysRes?.data || allPaysRes || []);
         setFarmers(farmersRes?.data || farmersRes || []);
         const hvArr = Array.isArray(harvestsRes) ? harvestsRes : (harvestsRes?.data || harvestsRes?.items || []);
@@ -62,12 +77,20 @@ const ManagerDashboard: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
-  const approvePayment = async (id: string) => {
+  const openProcessPaymentModal = (payment: any) => {
+    setSelectedPayment(payment);
+    setProcessPaymentModalOpen(true);
+  };
+
+  const handlePaymentProcessed = async () => {
+    // Reload approved payments
     try {
-      await paymentService.updatePayment(id, { status: 'approved' });
-      setPendingPayments((prev) => prev.filter((p) => (p._id || p.id) !== id));
+      const approvedRes = await paymentService.getPaymentsByStatus('approved');
+      setApprovedPayments(Array.isArray(approvedRes) ? approvedRes : (approvedRes?.data || approvedRes?.items || []));
+      showToast('✅ Payment processed successfully! Farmer will receive mobile money/bank alert.', 'success');
     } catch (e) {
-      setPpError('Approval failed');
+      setApprovalsError('Failed to reload payments');
+      showToast('❌ Failed to reload payments', 'error');
     }
   };
   // Map markers come from farmers list; default layout used when coords are absent
@@ -153,17 +176,51 @@ const ManagerDashboard: React.FC = () => {
   return (
     <>
     <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex justify-between items-center py-4">
+      {/* Premium Gradient Header - Matching Financial Manager & Field Officer Style */}
+      <nav className="fixed top-0 left-0 right-0 z-[100] bg-gradient-to-r from-[#6B2C91] via-[#9932CC] to-[#E85D75] shadow-lg">
+        <div className="w-full px-6 py-3">
+          <div className="flex items-center justify-between">
+            {/* Left Section - Logo and Title */}
             <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">🌾</span>
+              {/* Logo */}
+              <div className="flex-shrink-0">
+                <div className="w-14 h-14 rounded-full border-2 border-white bg-white/10 flex items-center justify-center backdrop-blur-sm">
+                  <span className="text-3xl">🌾</span>
                 </div>
+              </div>
+              
+              {/* Title */}
+              <div className="flex flex-col">
+                <h1 className="text-xl font-bold text-white leading-tight">Manager Portal</h1>
+                <p className="text-xs text-white/80">Farm Management System</p>
+              </div>
+            </div>
+            
+            {/* Right Section - Utilities */}
+            <div className="flex items-center space-x-1">
+              {/* Notifications */}
+              <div className="flex flex-col items-center space-y-1">
+                <NotificationBell />
+                <span className="text-xs font-medium text-white">Notifications</span>
+              </div>
+              
+              {/* User Profile Dropdown */}
+              <UserProfileDropdown
+                userName={user?.name || 'Manager'}
+                onLogout={logout}
+              />
+            </div>
+          </div>
+        </div>
+      </nav>
 
-            {/* Finance Requests (Notifications) */}
+      {/* Add top padding to account for fixed header */}
+      <div className="pt-20"></div>
+
+      {/* Main Content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
+        <div className="space-y-6">
+          {/* Finance Requests (Notifications) */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex justify-between items-center mb-6">
                 <h2 className="text-xl font-semibold">Finance Requests</h2>
@@ -206,52 +263,37 @@ const ManagerDashboard: React.FC = () => {
               )}
             </div>
 
-            {/* Pending Payments (Manager Approval) */}
+            {/* Approved Payments - Ready to Process */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Pending Payment Approvals</h2>
-                {ppLoading && <span className="text-sm text-gray-500">Loading...</span>}
+                <div>
+                  <h2 className="text-xl font-semibold">Approved Payments - Ready to Process</h2>
+                  <p className="text-xs text-gray-500 mt-1">Payments approved by Financial Manager, awaiting final processing</p>
+                </div>
+                {approvalsLoading && <span className="text-sm text-gray-500">Loading...</span>}
               </div>
-              {ppError && <p className="text-sm text-red-600 mb-3">{ppError}</p>}
-              {pendingPayments.length === 0 && !ppLoading ? (
-                <p className="text-sm text-gray-600">No pending requests.</p>
+              {approvalsError && <p className="text-sm text-red-600 mb-3">{approvalsError}</p>}
+              {approvedPayments.length === 0 && !approvalsLoading ? (
+                <p className="text-sm text-gray-600">No approved payments waiting.</p>
               ) : (
                 <div className="space-y-3">
-                  {pendingPayments.slice(0,6).map((p) => (
-                    <div key={(p._id || p.id) as string} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                  {approvedPayments.slice(0,6).map((p) => (
+                    <div key={(p._id || p.id) as string} className="flex items-center justify-between p-3 bg-blue-50 rounded-lg border border-blue-200">
                       <div className="text-sm text-gray-800">
                         <div className="font-medium">Farmer: {(p.farmer_id && p.farmer_id.toString) ? p.farmer_id.toString() : (p.farmer_id || '—')}</div>
                         <div className="text-gray-600">Amount: {formatUGX(Number(p.amount))}</div>
+                        <div className="text-xs text-green-600 mt-1">✓ Approved by Financial Manager</div>
                       </div>
                       <button
-                        onClick={() => approvePayment((p._id || p.id) as string)}
-                        className="px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-md text-sm"
+                        onClick={() => openProcessPaymentModal(p)}
+                        className="px-4 py-2 bg-gradient-to-r from-green-600 to-green-700 hover:from-green-700 hover:to-green-800 text-white rounded-lg text-sm font-medium shadow-md hover:shadow-lg transition-all"
                       >
-                        Approve
+                        💰 Process Payment
                       </button>
                     </div>
                   ))}
                 </div>
               )}
-            </div>
-                <span className="text-xl font-bold text-gray-900">AGRO</span>
-                <span className="text-sm text-gray-500">FARM MANAGEMENT</span>
-              </div>
-            </div>
-            <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-900">Manager Dashboard</h1>
-              <button className="p-2 bg-gray-100 rounded-lg">
-                <span className="text-lg">🔔</span>
-              </button>
-              <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
-              {/* Logout Button */}
-              <button 
-                onClick={logout}
-                className="px-4 py-2 bg-red-500 hover:bg-red-600 text-white rounded-lg transition-colors duration-200 font-medium shadow-lg hover:shadow-xl"
-                title="Logout"
-              >
-                🚪 Logout
-              </button>
             </div>
 
             {/* Recent Harvests */}
@@ -278,278 +320,355 @@ const ManagerDashboard: React.FC = () => {
                 </div>
               )}
             </div>
+
+          {/* Metrics Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {keyMetrics.map((metric, index) => (
+              <div key={index} className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-sm text-gray-600">{metric.title}</p>
+                    <p className="text-3xl font-bold text-gray-900">{metric.value}</p>
+                    <p className={`text-sm ${metric.color} mt-1`}>{metric.change} from last month</p>
+                  </div>
+                  <div className={`p-3 rounded-lg bg-gray-100`}>
+                    <metric.icon className={`w-6 h-6 ${metric.color}`} />
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
-        </div>
-      </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Top Metrics Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {keyMetrics.map((metric, index) => (
-            <div key={index} className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">{metric.title}</p>
-                  <p className="text-3xl font-bold text-gray-900">{metric.value}</p>
-                  <p className={`text-sm ${metric.color} mt-1`}>{metric.change} from last month</p>
+          {/* Main Grid Layout */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+            {/* Left Column - Map and Charts */}
+            <div className="lg:col-span-2 space-y-8">
+              {/* Farm Locations Map */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex justify-between items-center mb-4">
+                  <div>
+                    <h2 className="text-xl font-semibold">Farm Locations</h2>
+                    <span className="text-xs text-gray-500">Interactive map showing all registered farms</span>
+                  </div>
+                  <button 
+                    onClick={() => setAllFarmsModalOpen(!allFarmsModalOpen)}
+                    className="px-4 py-2 text-sm bg-gradient-to-r from-[#7C3AED] to-[#9333EA] text-white rounded-lg hover:from-[#6D28D9] hover:to-[#7C3AED] transition-all shadow-md hover:shadow-lg flex items-center gap-2"
+                  >
+                    {allFarmsModalOpen ? (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" />
+                        </svg>
+                        Hide Farms List
+                      </>
+                    ) : (
+                      <>
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                        View All Farms ({farmers.length})
+                      </>
+                    )}
+                  </button>
                 </div>
-                <div className={`p-3 rounded-lg bg-gray-100`}>
-                  <metric.icon className={`w-6 h-6 ${metric.color}`} />
-                </div>
-              </div>
-            </div>
-          ))}
-        </div>
-
-        {/* Main Content Grid */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-          {/* Left Column - Map and Performance */}
-          <div className="lg:col-span-2 space-y-8">
-            {/* Farm Locations Map (Default layout if no coordinates) */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Farm Locations</h2>
-                <button className="text-sm text-blue-600 hover:text-blue-800">View All Farms</button>
-              </div>
-              
-              {/* Default Map: simple gradient background with deterministic markers for farmers */}
-              <div className="relative h-80 bg-gradient-to-br from-green-100 to-green-200 rounded-lg overflow-hidden border-2 border-green-100">
-                <div className="absolute inset-0 bg-gradient-to-br from-green-100 to-green-200"></div>
                 
-                {/* Deterministic positions derived from index so markers always render */}
-                {(farmers && farmers.length ? farmers : Array.from({ length: 6 }).map((_, i) => ({ _id: `demo-${i}`, name: `Farm ${i+1}` })) ).map((f: any, index: number) => {
-                  const left = 10 + (index * 17) % 70; // 10% to 80%
-                  const top = 20 + (index * 13) % 60;  // 20% to 80%
-                  const color = 'bg-green-600';
-                  return (
-                    <div
-                      key={String(f._id || index)}
-                      className={`group absolute w-4 h-4 rounded-full ${color} border-2 border-white shadow-lg cursor-pointer`}
-                      style={{ left: `${left}%`, top: `${top}%` }}
-                      title={f.name || 'Farmer'}
-                      onClick={() => openWorkRates(String(f._id || ''))}
-                    >
-                      <div className="opacity-0 group-hover:opacity-100 transition-opacity absolute -top-10 left-1/2 -translate-x-1/2 bg-white text-gray-700 text-xs px-2 py-1 rounded shadow">
-                        {f.name || 'Farmer'}
+                <div className="relative z-0">
+                  <FieldGoogleMap farmers={farmers} height="400px" />
+                </div>
+                <p className="mt-2 text-xs text-gray-500">Click on map markers to view farmer details and work rates.</p>
+
+                {/* Farms List - Collapsible */}
+                {allFarmsModalOpen && (
+                  <div className="mt-6 border-t border-gray-200 pt-6">
+                    <div className="mb-4">
+                      <h3 className="text-lg font-semibold text-gray-900">All Registered Farms ({farmers.length})</h3>
+                      <p className="text-sm text-gray-500">Complete list with details and GPS status</p>
+                    </div>
+                    
+                    {farmers.length === 0 ? (
+                      <div className="text-center py-8 text-gray-500">
+                        <svg className="w-12 h-12 mx-auto mb-3 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                        <p>No farms registered yet</p>
+                      </div>
+                    ) : (
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        {farmers.map((farmer, index) => (
+                          <div 
+                            key={farmer._id} 
+                            className="border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow bg-white"
+                          >
+                            <div className="flex justify-between items-start mb-3">
+                              <div className="flex-1">
+                                <div className="flex items-center gap-2 mb-1">
+                                  <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-600 text-xs font-bold">
+                                    {index + 1}
+                                  </span>
+                                  <h4 className="font-semibold text-gray-900">{farmer.name || 'Unknown Farmer'}</h4>
+                                </div>
+                                <p className="text-xs text-gray-500">ID: {String(farmer._id).substring(0, 12)}...</p>
+                              </div>
+                              {farmer.location?.coordinates ? (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-800">
+                                  <svg className="w-3 h-3 mr-1" fill="currentColor" viewBox="0 0 20 20">
+                                    <path fillRule="evenodd" d="M5.05 4.05a7 7 0 119.9 9.9L10 18.9l-4.95-4.95a7 7 0 010-9.9zM10 11a2 2 0 100-4 2 2 0 000 4z" clipRule="evenodd" />
+                                  </svg>
+                                  GPS
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-600">
+                                  No GPS
+                                </span>
+                              )}
+                            </div>
+                            
+                            <div className="space-y-2 text-sm">
+                              <div className="flex items-center gap-2 text-gray-600">
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 5a2 2 0 012-2h3.28a1 1 0 01.948.684l1.498 4.493a1 1 0 01-.502 1.21l-2.257 1.13a11.042 11.042 0 005.516 5.516l1.13-2.257a1 1 0 011.21-.502l4.493 1.498a1 1 0 01.684.949V19a2 2 0 01-2 2h-1C9.716 21 3 14.284 3 6V5z" />
+                                </svg>
+                                <span>{farmer.contact || farmer.phone || 'No contact'}</span>
+                              </div>
+                              
+                              {farmer.crops && farmer.crops.length > 0 && (
+                                <div className="flex items-center gap-2 text-gray-600">
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
+                                  </svg>
+                                  <span className="truncate">{farmer.crops.join(', ')}</span>
+                                </div>
+                              )}
+                            </div>
+                            
+                            <div className="mt-3 pt-3 border-t border-gray-100">
+                              <button 
+                                onClick={() => openWorkRates(String(farmer._id))}
+                                className="w-full px-3 py-2 text-sm font-medium text-purple-600 bg-purple-50 hover:bg-purple-100 rounded-lg transition-colors"
+                              >
+                                View Work Rates & Details
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Performance Metrics */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-xl font-semibold mb-6">Performance Metrics</h2>
+                <div className="grid grid-cols-2 gap-6">
+                  {performanceData.map((item, index) => (
+                    <div key={index} className="space-y-3">
+                      <div className="flex justify-between items-center">
+                        <span className="text-sm font-medium text-gray-700">{item.metric}</span>
+                        <span className="text-sm font-bold text-gray-900">{item.value}%</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-3">
+                        <div
+                          className="h-3 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${item.value}%`,
+                            backgroundColor: item.color
+                          }}
+                        ></div>
                       </div>
                     </div>
-                  );
-                })}
-                
-                {/* Map Legend */}
-                <div className="absolute bottom-4 left-4 bg-white rounded-lg p-3 shadow-md">
-                  <div className="space-y-2 text-xs">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 bg-green-600 rounded-full"></div>
-                      <span>Farmers</span>
-                    </div>
-                  </div>
-                </div>
-                
-                {/* Info hint */}
-                <div className="absolute top-4 right-4 bg-white rounded-lg p-3 shadow-md text-xs text-gray-600">
-                  Click markers to view work rates
+                  ))}
                 </div>
               </div>
-            </div>
 
-            {/* Performance Metrics */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-6">Performance Metrics</h2>
-              <div className="grid grid-cols-2 gap-6">
-                {performanceData.map((item, index) => (
-                  <div key={index} className="space-y-3">
-                    <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-gray-700">{item.metric}</span>
-                      <span className="text-sm font-bold text-gray-900">{item.value}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-3">
-                      <div
-                        className="h-3 rounded-full transition-all duration-300"
-                        style={{
-                          width: `${item.value}%`,
-                          backgroundColor: item.color
-                        }}
-                      ></div>
-                    </div>
-                  </div>
-                ))}
+              {/* Revenue Analytics */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold">Revenue Analytics</h2>
+                  <select className="text-sm border border-gray-300 rounded px-3 py-1">
+                    <option>Last 12 Months</option>
+                    <option>Last 6 Months</option>
+                    <option>Last 3 Months</option>
+                  </select>
+                </div>
+                
+                <div className="h-80">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={revenueData}>
+                      <CartesianGrid strokeDasharray="3 3" />
+                      <XAxis dataKey="month" />
+                      <YAxis />
+                      <Tooltip />
+                      <Bar dataKey="revenue" fill="#3b82f6" name="Revenue" />
+                      <Bar dataKey="profit" fill="#22c55e" name="Profit" />
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
               </div>
             </div>
 
-            {/* Revenue Analytics */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Revenue Analytics</h2>
-                <select className="text-sm border border-gray-300 rounded px-3 py-1">
-                  <option>Last 12 Months</option>
-                  <option>Last 6 Months</option>
-                  <option>Last 3 Months</option>
-                </select>
-              </div>
-              
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip />
-                    <Bar dataKey="revenue" fill="#3b82f6" name="Revenue" />
-                    <Bar dataKey="profit" fill="#22c55e" name="Profit" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
-          </div>
+            {/* Right Column - Crop Distribution & Activities */}
+            <div className="space-y-8">
+              {/* Crop Distribution */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-xl font-semibold mb-6">Crop Distribution</h2>
+                
+                <div className="h-64 mb-6">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <PieChart>
+                      <Pie
+                        data={cropDistributionData}
+                        cx="50%"
+                        cy="50%"
+                        innerRadius={40}
+                        outerRadius={80}
+                        dataKey="value"
+                      >
+                        {cropDistributionData.map((entry, index) => (
+                          <Cell key={`cell-${index}`} fill={entry.color} />
+                        ))}
+                      </Pie>
+                      <Tooltip />
+                    </PieChart>
+                  </ResponsiveContainer>
+                </div>
 
-          {/* Right Column - Crop Distribution, Recent Activities, Recent Harvests */}
-          <div className="space-y-8">
-            {/* Crop Distribution */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-6">Crop Distribution</h2>
-              
-              <div className="h-64 mb-6">
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={cropDistributionData}
-                      cx="50%"
-                      cy="50%"
-                      innerRadius={40}
-                      outerRadius={80}
-                      dataKey="value"
-                    >
-                      {cropDistributionData.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={entry.color} />
-                      ))}
-                    </Pie>
-                    <Tooltip />
-                  </PieChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="space-y-3">
-                {cropDistributionData.map((item, index) => (
-                  <div key={index} className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div
-                        className="w-3 h-3 rounded-full"
-                        style={{ backgroundColor: item.color }}
-                      ></div>
-                      <span className="text-sm font-medium">{item.name}</span>
+                <div className="space-y-3">
+                  {cropDistributionData.map((item, index) => (
+                    <div key={index} className="flex items-center justify-between">
+                      <div className="flex items-center space-x-2">
+                        <div
+                          className="w-3 h-3 rounded-full"
+                          style={{ backgroundColor: item.color }}
+                        ></div>
+                        <span className="text-sm font-medium">{item.name}</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-sm font-bold text-gray-900">{item.value}%</div>
+                        <div className="text-xs text-gray-500">{item.acres} acres</div>
+                      </div>
                     </div>
-                    <div className="text-right">
-                      <div className="text-sm font-bold text-gray-900">{item.value}%</div>
-                      <div className="text-xs text-gray-500">{item.acres} acres</div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Recent Activities */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <div className="flex justify-between items-center mb-6">
+                  <h2 className="text-xl font-semibold">Recent Activities</h2>
+                  <button className="text-sm text-blue-600 hover:text-blue-800">View All</button>
+                </div>
+
+                <div className="space-y-4">
+                  {recentActivities.map((activity) => (
+                    <div key={activity.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
+                      <div className={`w-2 h-2 rounded-full mt-2 ${
+                        activity.type === 'harvest' ? 'bg-green-500' :
+                        activity.type === 'maintenance' ? 'bg-blue-500' :
+                        activity.type === 'inspection' ? 'bg-yellow-500' :
+                        'bg-purple-500'
+                      }`}></div>
+                      <div className="flex-1">
+                        <p className="text-sm font-medium text-gray-900">{activity.activity}</p>
+                        <p className="text-xs text-gray-500">{activity.time}</p>
+                      </div>
                     </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Recent Activities */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Recent Activities</h2>
-                <button className="text-sm text-blue-600 hover:text-blue-800">View All</button>
+                  ))}
+                </div>
               </div>
 
-              <div className="space-y-4">
-                {recentActivities.map((activity) => (
-                  <div key={activity.id} className="flex items-start space-x-3 p-3 bg-gray-50 rounded-lg">
-                    <div className={`w-2 h-2 rounded-full mt-2 ${
-                      activity.type === 'harvest' ? 'bg-green-500' :
-                      activity.type === 'maintenance' ? 'bg-blue-500' :
-                      activity.type === 'inspection' ? 'bg-yellow-500' :
-                      'bg-purple-500'
-                    }`}></div>
-                    <div className="flex-1">
-                      <p className="text-sm font-medium text-gray-900">{activity.activity}</p>
-                      <p className="text-xs text-gray-500">{activity.time}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-
-            {/* Quick Actions */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-6">Quick Actions</h2>
-              <div className="grid grid-cols-2 gap-3">
-                <button className="p-3 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
-                  <Package className="w-5 h-5 mx-auto mb-1" />
-                  <span className="text-xs font-medium">Add Crop</span>
-                </button>
-                <button className="p-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
-                  <MapPin className="w-5 h-5 mx-auto mb-1" />
-                  <span className="text-xs font-medium">New Farm</span>
-                </button>
-                <button className="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors">
-                  <Users className="w-5 h-5 mx-auto mb-1" />
-                  <span className="text-xs font-medium">Add Worker</span>
-                </button>
-                <button className="p-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors">
-                  <TrendingUp className="w-5 h-5 mx-auto mb-1" />
-                  <span className="text-xs font-medium">Reports</span>
-                </button>
+              {/* Quick Actions */}
+              <div className="bg-white rounded-lg shadow-sm p-6">
+                <h2 className="text-xl font-semibold mb-6">Quick Actions</h2>
+                <div className="grid grid-cols-2 gap-3">
+                  <button className="p-3 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
+                    <Package className="w-5 h-5 mx-auto mb-1" />
+                    <span className="text-xs font-medium">Add Crop</span>
+                  </button>
+                  <button className="p-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+                    <MapPin className="w-5 h-5 mx-auto mb-1" />
+                    <span className="text-xs font-medium">New Farm</span>
+                  </button>
+                  <button className="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors">
+                    <Users className="w-5 h-5 mx-auto mb-1" />
+                    <span className="text-xs font-medium">Add Worker</span>
+                  </button>
+                  <button className="p-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors">
+                    <TrendingUp className="w-5 h-5 mx-auto mb-1" />
+                    <span className="text-xs font-medium">Reports</span>
+                  </button>
+                </div>
               </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
 
-    {(ratesModalOpen && ratesData) ? (
-      <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-        <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
-          <h3 className="text-lg font-semibold mb-4">Farmer Work Rates</h3>
-          {ratesLoading ? (
-            <p className="text-sm text-gray-600">Loading...</p>
-          ) : ratesError ? (
-            <p className="text-sm text-red-600">{ratesError}</p>
-          ) : (
-            <div className="text-sm">
-              <div className="flex justify-between mb-2">
-                <span className="text-gray-600">Farmer ID</span>
-                <span className="font-medium">{ratesData!.farmerId}</span>
-              </div>
-              <div className="flex justify-between mb-2">
-                <span className="text-gray-600">Total Harvest Quantity</span>
-                <span className="font-medium">{Number(ratesData!.totalQuantity).toLocaleString()}</span>
-              </div>
-              <div className="flex justify-between mb-4">
-                <span className="text-gray-600">Last Harvest Date</span>
-                <span className="font-medium">{ratesData!.lastDate || '—'}</span>
-              </div>
-              <div className="max-h-48 overflow-auto border rounded">
-                <table className="min-w-full text-xs">
-                  <thead className="bg-gray-50">
-                    <tr className="text-left text-gray-600">
-                      <th className="py-1 px-2">Date</th>
-                      <th className="py-1 px-2">Crop</th>
-                      <th className="py-1 px-2">Quantity</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ratesData!.harvests.map((h, i) => (
-                      <tr key={i} className="border-t">
-                        <td className="py-1 px-2">{h.harvest_date ? new Date(h.harvest_date).toLocaleDateString() : '—'}</td>
-                        <td className="py-1 px-2">{h.crop_type || '—'}</td>
-                        <td className="py-1 px-2">{Number(h.quantity || 0).toLocaleString()}</td>
+      {/* Work Rates Modal */}
+      {(ratesModalOpen && ratesData) ? (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
+            <h3 className="text-lg font-semibold mb-4">Farmer Work Rates</h3>
+            {ratesLoading ? (
+              <p className="text-sm text-gray-600">Loading...</p>
+            ) : ratesError ? (
+              <p className="text-sm text-red-600">{ratesError}</p>
+            ) : (
+              <div className="text-sm">
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-600">Farmer ID</span>
+                  <span className="font-medium">{ratesData!.farmerId}</span>
+                </div>
+                <div className="flex justify-between mb-2">
+                  <span className="text-gray-600">Total Harvest Quantity</span>
+                  <span className="font-medium">{Number(ratesData!.totalQuantity).toLocaleString()}</span>
+                </div>
+                <div className="flex justify-between mb-4">
+                  <span className="text-gray-600">Last Harvest Date</span>
+                  <span className="font-medium">{ratesData!.lastDate || '—'}</span>
+                </div>
+                <div className="max-h-48 overflow-auto border rounded">
+                  <table className="min-w-full text-xs">
+                    <thead className="bg-gray-50">
+                      <tr className="text-left text-gray-600">
+                        <th className="py-1 px-2">Date</th>
+                        <th className="py-1 px-2">Crop</th>
+                        <th className="py-1 px-2">Quantity</th>
                       </tr>
-                    ))}
-                  </tbody>
-                </table>
+                    </thead>
+                    <tbody>
+                      {ratesData!.harvests.map((h, i) => (
+                        <tr key={i} className="border-t">
+                          <td className="py-1 px-2">{h.harvest_date ? new Date(h.harvest_date).toLocaleDateString() : '—'}</td>
+                          <td className="py-1 px-2">{h.crop_type || '—'}</td>
+                          <td className="py-1 px-2">{Number(h.quantity || 0).toLocaleString()}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               </div>
+            )}
+            <div className="flex justify-end mt-4">
+              <button onClick={() => setRatesModalOpen(false)} className="px-4 py-2 rounded bg-gray-200 text-gray-800">Close</button>
             </div>
-          )}
-          <div className="flex justify-end mt-4">
-            <button onClick={() => setRatesModalOpen(false)} className="px-4 py-2 rounded bg-gray-200 text-gray-800">Close</button>
           </div>
         </div>
-      </div>
-    ) : null}
+      ) : null}
+
+      {/* Process Payment Modal */}
+      {selectedPayment && (
+        <ProcessPaymentModal
+          isOpen={processPaymentModalOpen}
+          onClose={() => setProcessPaymentModalOpen(false)}
+          payment={selectedPayment}
+          onSuccess={handlePaymentProcessed}
+        />
+      )}
+
+      {/* Toast Notifications */}
+      {ToastComponent}
+    </div>
     </>
   );
 };

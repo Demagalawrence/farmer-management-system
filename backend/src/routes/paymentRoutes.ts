@@ -9,7 +9,7 @@ const paymentController = new PaymentController();
 // Field Officer payment requests
 router.post('/request', authenticate, authorize('field_officer', 'finance', 'manager'), validate('createPaymentRequest'), paymentController.requestPayment);
 
-router.post('/', authenticate, authorize('finance', 'manager'), validate('createPayment'), paymentController.createPayment);
+router.post('/', authenticate, authorize('field_officer', 'finance', 'manager'), validate('createPayment'), paymentController.createPayment);
 router.get('/:id', authenticate, validateObjectId('id'), paymentController.getPaymentById);
 router.get('/farmer/:farmerId', authenticate, validateObjectId('farmerId'), paymentController.getPaymentsByFarmerId);
 router.get('/status/:status', authenticate, paymentController.getPaymentsByStatus);

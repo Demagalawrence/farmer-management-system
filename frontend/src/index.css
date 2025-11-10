@@ -1,5 +1,15 @@
 @import "tailwindcss";
 
+@theme {
+  /* Financial Manager Portal Brand Colors */
+  --color-fm-primary: #0369a1;
+  --color-fm-primary-light: #7dd3fc;
+  --color-fm-primary-dark: #0c4a6e;
+  --color-fm-primary-hover: #075985;
+  --color-fm-secondary: #f0f9ff;
+  --color-fm-accent: #0284c7;
+}
+
 :root {
   font-family: system-ui, Avenir, Helvetica, Arial, sans-serif;
   line-height: 1.5;
@@ -22,4 +32,49 @@ body {
   background-color: #ffffff;
 }
 
+/* Notification and dropdown animations */
+@keyframes slideInFromRight {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
 
+@keyframes slideInFromTop {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-slideInFromRight {
+  animation: slideInFromRight 0.3s ease-out;
+}
+
+.animate-slideInFromTop {
+  animation: slideInFromTop 0.2s ease-out;
+}
+
+/* Ensure Leaflet map and controls stay below navbar */
+.leaflet-container,
+.leaflet-pane,
+.leaflet-control-container {
+  z-index: 1 !important;
+}
+
+.leaflet-top,
+.leaflet-bottom {
+  z-index: 10 !important;
+}
+
+.leaflet-popup {
+  z-index: 20 !important;
+}

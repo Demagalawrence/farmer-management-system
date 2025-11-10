@@ -17,6 +17,7 @@
     "concurrently": "^8.2.2"
   },
   "dependencies": {
+    "@sendgrid/mail": "^8.1.6",
     "nodemailer": "^7.0.10"
   }
 }

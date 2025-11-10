@@ -5,6 +5,7 @@ import { connectToDatabase } from './config/db';
 import { errorHandler } from './middleware/errorHandler';
 import logger from './utils/logger';
 import { backupService } from './utils/backup';
+import { startEmailQueueProcessor } from './utils/emailQueueProcessor';
 
 // Import routes
 import authRoutes from './routes/authRoutes';
@@ -16,6 +17,8 @@ import paymentRoutes from './routes/paymentRoutes';
 import reportRoutes from './routes/reportRoutes';
 import searchRoutes from './routes/searchRoutes';
 import financeRoutes from './routes/financeRoutes';
+import formalReportRoutes from './routes/formalReports';
+import notificationRoutes from './routes/notifications';
 
 // Load environment variables
 dotenv.config();
@@ -43,6 +46,9 @@ connectToDatabase()
       backupService.scheduleAutoBackup('0 2 * * *');
       logger.info('Automatic backups scheduled');
     }
+
+    // Start email queue processor (runs every 5 minutes)
+    startEmailQueueProcessor();
   })
   .catch((error) => {
     logger.error('Failed to connect to MongoDB:', error);
@@ -60,6 +66,8 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/finance', financeRoutes);
+app.use('/api/formal-reports', formalReportRoutes);
+app.use('/api/notifications', notificationRoutes);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

@@ -87,7 +87,7 @@ const FinancialManagerDashboard: React.FC = () => {
           <div className="flex justify-between items-center py-4">
             <div className="flex items-center space-x-4">
               <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
+                <div className="w-8 h-8 bg-fm-primary rounded flex items-center justify-center">
                   <span className="text-white font-bold text-sm">💰</span>
                 </div>
                 <span className="text-xl font-bold text-gray-900">FINANCIAL</span>
@@ -183,7 +183,7 @@ const FinancialManagerDashboard: React.FC = () => {
           <div className="bg-white rounded-lg shadow-sm p-6">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold">Revenue & Profit Trends</h2>
-              <select className="text-sm border border-gray-300 rounded px-3 py-1">
+              <select className="text-sm border border-gray-300 rounded px-3 py-1 focus:outline-none focus:ring-2 focus:ring-fm-primary focus:border-transparent">
                 <option>Last 6 Months</option>
                 <option>Last 12 Months</option>
                 <option>This Year</option>
@@ -200,7 +200,7 @@ const FinancialManagerDashboard: React.FC = () => {
                   <Line 
                     type="monotone" 
                     dataKey="revenue" 
-                    stroke="#3B82F6" 
+                    stroke="#0369A1" 
                     strokeWidth={3}
                     name="Revenue"
                   />
@@ -273,7 +273,7 @@ const FinancialManagerDashboard: React.FC = () => {
                       <td className="py-2 pr-4">{formatUGX(p.amount || 0)}</td>
                       <td className="py-2 pr-4">{p.requested_at ? new Date(p.requested_at).toLocaleString() : '-'}</td>
                       <td className="py-2 pr-4 space-x-2">
-                        <button onClick={() => approvePayment(String(p._id))} className="px-3 py-1 rounded bg-green-600 text-white">Approve</button>
+                        <button onClick={() => approvePayment(String(p._id))} className="px-3 py-1 rounded bg-fm-primary hover:bg-fm-primary-hover text-white transition-colors">Approve</button>
                         <button onClick={() => rejectPayment(String(p._id))} className="px-3 py-1 rounded bg-red-600 text-white">Reject</button>
                       </td>
                     </tr>
@@ -344,7 +344,7 @@ const FinancialManagerDashboard: React.FC = () => {
                   <XAxis dataKey="crop" />
                   <YAxis />
                   <Tooltip formatter={(value) => [`${value}%`, 'ROI']} />
-                  <Bar dataKey="roi" fill="#10B981" />
+                  <Bar dataKey="roi" fill="#0369A1" />
                 </BarChart>
               </ResponsiveContainer>
             </div>

@@ -1,7 +1,7 @@
 import { Collection, ObjectId } from 'mongodb';
 import { Payment, PaymentInput } from '../models/Payment';
 import { getDb } from '../config/db';
-import { EmailService } from './emailService';
+import { sendPaymentEmail } from '../utils/email';
 
 export class PaymentService {
   private collection: Collection<Payment>;
@@ -81,33 +81,28 @@ export class PaymentService {
       { $set: payment },
       { returnDocument: 'after' }
     );
-    try {
-      if (payment && (payment as any).status === 'approved' && result) {
-        const db = getDb();
-        const farmer = await db.collection('farmers').findOne({ _id: (result as any).farmer_id });
-        if (farmer && farmer.email) {
-          const amount = (result as any).amount;
-          const subject = 'Payment Approved';
-          const text = `Hello ${farmer.name || 'Farmer'}, your payment of ${amount} has been approved. You will receive the funds shortly.`;
-          await EmailService.send(farmer.email, subject, text);
-        }
-      }
-    } catch (e) {
-      console.error('Failed to send approval email:', e);
-    }
+    // Send payment completion email when payment is marked as paid
     try {
       if (payment && (payment as any).status === 'paid' && result) {
         const db = getDb();
         const farmer = await db.collection('farmers').findOne({ _id: (result as any).farmer_id });
         if (farmer && farmer.email) {
           const amount = (result as any).amount;
-          const subject = 'Payment Completed';
-          const text = `Hello ${farmer.name || 'Farmer'}, your payment of ${amount} has been completed and disbursed. Thank you.`;
-          await EmailService.send(farmer.email, subject, text);
+          const paymentId = String(result._id);
+          const paymentType = (result as any).payment_type || 'payment';
+          const calculation = (result as any).calculation;
+          await sendPaymentEmail(
+            farmer.email,
+            farmer.name || 'Farmer',
+            amount,
+            paymentId,
+            paymentType,
+            calculation
+          );
         }
       }
     } catch (e) {
-      console.error('Failed to send paid email:', e);
+      console.error('Failed to send payment completion email:', e);
     }
     try {
       if (payment && (payment as any).status === 'paid' && result) {

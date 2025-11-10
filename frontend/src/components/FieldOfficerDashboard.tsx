@@ -14,8 +14,7 @@ const FieldOfficerDashboard: React.FC = () => {
     email: '',
     password: '',
     phone: '',
-    address: '',
-    farm_size: ''
+    address: ''
   });
   const [registerError, setRegisterError] = useState('');
   const [registerSuccess, setRegisterSuccess] = useState('');
@@ -92,7 +91,6 @@ const FieldOfficerDashboard: React.FC = () => {
         user_id: userData.userId,
         phone: registerForm.phone,
         address: registerForm.address,
-        farm_size: parseFloat(registerForm.farm_size),
         status: 'active'
       };
 
@@ -104,8 +102,7 @@ const FieldOfficerDashboard: React.FC = () => {
         email: '',
         password: '',
         phone: '',
-        address: '',
-        farm_size: ''
+        address: ''
       });
       
       // Close modal after 2 seconds
@@ -706,22 +703,6 @@ const FieldOfficerDashboard: React.FC = () => {
                   className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
                   placeholder="Enter farmer's address"
                   rows={3}
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Farm Size (acres) *
-                </label>
-                <input
-                  type="number"
-                  required
-                  step="0.1"
-                  min="0"
-                  value={registerForm.farm_size}
-                  onChange={(e) => setRegisterForm({ ...registerForm, farm_size: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  placeholder="e.g., 50.5"
                 />
               </div>
 

@@ -1,4 +1,5 @@
 import type { Report } from '../../../backend/src/models/Report';
+import type { GenerateReportRequest, GenerateReportResponse, UserReportsResponse, ReportRecipient } from '../types/reports';
 import api from './api';
 
 export const reportService = {
@@ -68,5 +69,53 @@ export const reportService = {
       }
     });
     return response.data;
+  },
+
+  // ====== Formal Report Functions ======
+  
+  // Generate formal financial PDF report
+  generateFormalReport: async (request: GenerateReportRequest): Promise<GenerateReportResponse> => {
+    const response = await api.post('/formal-reports/generate-formal-report', request);
+    return response.data;
+  },
+
+  // Get user's formal reports
+  getUserReports: async (page: number = 1, limit: number = 20): Promise<UserReportsResponse> => {
+    const response = await api.get('/formal-reports/user-reports', {
+      params: { page, limit }
+    });
+    return response.data;
+  },
+
+  // Get available recipients for report distribution
+  getReportRecipients: async (role?: string): Promise<{ success: boolean; data: ReportRecipient[] }> => {
+    const response = await api.get('/formal-reports/recipients', {
+      params: role ? { role } : {}
+    });
+    return response.data;
+  },
+
+  // Download report as PDF
+  downloadReport: async (reportId: string): Promise<void> => {
+    const response = await api.get(`/formal-reports/download/${reportId}`, {
+      responseType: 'blob'
+    });
+    
+    // Create download link
+    const url = window.URL.createObjectURL(new Blob([response.data]));
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `financial-report-${reportId}.pdf`);
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.URL.revokeObjectURL(url);
+  },
+
+  // Get view URL for report with auth token for new tab viewing
+  getReportViewUrl: (reportId: string): string => {
+    const token = localStorage.getItem('token');
+    const baseUrl = `${api.defaults.baseURL}/formal-reports/view/${reportId}`;
+    return token ? `${baseUrl}?token=${encodeURIComponent(token)}` : baseUrl;
   },
 };
