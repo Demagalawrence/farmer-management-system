@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
 import { Search, MapPin, Edit, Sun, X, UserPlus } from 'lucide-react';
 import { farmerService } from '../services/farmerService';
+import { harvestService } from '../services/harvestService';
 
 const FieldOfficerDashboard: React.FC = () => {
   const [searchTerm, setSearchTerm] = useState('');
@@ -18,10 +19,44 @@ const FieldOfficerDashboard: React.FC = () => {
   });
   const [registerError, setRegisterError] = useState('');
   const [registerSuccess, setRegisterSuccess] = useState('');
+  const [farmers, setFarmers] = useState<any[]>([]);
+  const [selectedFarmerId, setSelectedFarmerId] = useState<string>('');
+  const [harvests, setHarvests] = useState<any[]>([]);
+  const [loadingHarvests, setLoadingHarvests] = useState(false);
+  const [harvestsError, setHarvestsError] = useState('');
 
   useEffect(() => {
     // Component mounted
+    const loadFarmers = async () => {
+      try {
+        const res = await farmerService.getAllFarmers();
+        const list = res?.data || res; // backend may wrap in {data}
+        setFarmers(list);
+      } catch (e) {
+        // noop
+      }
+    };
+    loadFarmers();
   }, []);
+
+  useEffect(() => {
+    const fetchHarvests = async () => {
+      if (!selectedFarmerId) return;
+      setLoadingHarvests(true);
+      setHarvestsError('');
+      try {
+        const res = await harvestService.getHarvestsByFarmerId(selectedFarmerId);
+        const list = res?.data || res;
+        setHarvests(Array.isArray(list) ? list : []);
+      } catch (e) {
+        setHarvestsError('Failed to load harvest records');
+        setHarvests([]);
+      } finally {
+        setLoadingHarvests(false);
+      }
+    };
+    fetchHarvests();
+  }, [selectedFarmerId]);
 
   const handleRegisterFarmer = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -517,6 +552,71 @@ const FieldOfficerDashboard: React.FC = () => {
                   ))}
                 </div>
               </div>
+            </div>
+
+            {/* Farmer Harvest Records (Bar Chart) */}
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+                <h2 className="text-xl font-semibold">Farmer Harvest Records</h2>
+                <div className="flex items-center gap-2">
+                  <label className="text-sm text-gray-600">Farmer</label>
+                  <select
+                    value={selectedFarmerId}
+                    onChange={(e) => setSelectedFarmerId(e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded text-sm min-w-[220px]"
+                  >
+                    <option value="">Select a farmer</option>
+                    {farmers.map((f: any) => (
+                      <option key={f._id || f.id} value={(f._id || f.id)?.toString?.() || (f._id || f.id)}>
+                        {f.name || f.full_name || 'Unnamed Farmer'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+
+              {harvestsError && (
+                <div className="text-sm text-red-600 mb-3">{harvestsError}</div>
+              )}
+
+              {/* Compute monthly aggregation */}
+              {(() => {
+                const monthNames = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+                const byMonth: Record<string, number> = {};
+                for (let i = 0; i < 12; i++) byMonth[monthNames[i]] = 0;
+                (harvests || []).forEach((h: any) => {
+                  const d = new Date(h.harvest_date || h.harvestDate || h.date);
+                  if (!isNaN(d.getTime())) {
+                    const m = monthNames[d.getMonth()];
+                    const qty = Number(h.quantity_tons ?? h.quantityTons ?? h.quantity ?? 0);
+                    byMonth[m] += isNaN(qty) ? 0 : qty;
+                  }
+                });
+                const chartData = monthNames.map((m) => ({ month: m, tons: byMonth[m] }));
+
+                return (
+                  <div className="h-72">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <BarChart data={chartData}>
+                        <CartesianGrid strokeDasharray="3 3" />
+                        <XAxis dataKey="month" />
+                        <YAxis />
+                        <Tooltip />
+                        <Legend />
+                        <Bar dataKey="tons" name="Quantity (tons)" fill="#22c55e" radius={[4,4,0,0]} />
+                      </BarChart>
+                    </ResponsiveContainer>
+                  </div>
+                );
+              })()}
+
+              {loadingHarvests && (
+                <div className="mt-3 text-sm text-gray-500">Loading harvest data...</div>
+              )}
+
+              {!loadingHarvests && selectedFarmerId && (harvests?.length ?? 0) === 0 && (
+                <div className="mt-3 text-sm text-gray-500">No harvest records found for the selected farmer.</div>
+              )}
             </div>
           </div>
         </div>

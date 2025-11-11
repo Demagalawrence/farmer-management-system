@@ -4,10 +4,12 @@ import { DollarSign, TrendingUp, TrendingDown, CreditCard, PiggyBank, Calculator
 import { paymentService } from '../services/paymentService';
 import { farmerService } from '../services/farmerService';
 import { formatUGX } from '../utils/currency';
+import { reportService } from '../services/reportService';
 
 const FinancialManagerDashboard: React.FC = () => {
   const [payments, setPayments] = useState<any[]>([]);
   const [farmers, setFarmers] = useState<any[]>([]);
+  const [budgetReports, setBudgetReports] = useState<any[]>([]);
 
   useEffect(() => {
     loadData();
@@ -15,12 +17,31 @@ const FinancialManagerDashboard: React.FC = () => {
 
   const loadData = async () => {
     try {
-      const [paymentsRes, farmersRes] = await Promise.all([
+      const [paymentsRes, farmersRes, reportsRes] = await Promise.all([
         paymentService.getAllPayments(),
-        farmerService.getAllFarmers()
+        farmerService.getAllFarmers(),
+        reportService.getReportsByType('payment_report')
       ]);
       setPayments(paymentsRes.data || []);
       setFarmers(farmersRes.data || []);
+      const repList = Array.isArray(reportsRes)
+        ? reportsRes
+        : (reportsRes?.data || reportsRes?.items || []);
+      let budgets = repList.filter((r: any) =>
+        String(r.type) === 'payment_report' && (r.data?.category === 'budget_request' || r.data?.sent_to === 'finance')
+      );
+
+      // Fallback: try all reports if none found (some APIs return under /reports)
+      if (!budgets.length) {
+        try {
+          const allRes = await reportService.getAllReports();
+          const all = Array.isArray(allRes) ? allRes : (allRes?.data || allRes?.items || []);
+          budgets = all.filter((r: any) =>
+            String(r.type) === 'payment_report' && (r.data?.category === 'budget_request' || r.data?.sent_to === 'finance')
+          );
+        } catch {}
+      }
+      setBudgetReports(budgets);
     } catch (error) {
       console.error('Error loading data:', error);
     }
@@ -282,6 +303,50 @@ const FinancialManagerDashboard: React.FC = () => {
                 {payments.filter(p => p.status === 'pending').length === 0 && (
                   <tr>
                     <td className="py-4 text-gray-500" colSpan={5}>No pending payment requests</td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        {/* Budget Requests from Field Officers */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
+          <h2 className="text-xl font-semibold mb-4">Budget Requests</h2>
+          <div className="overflow-x-auto">
+            <table className="min-w-full text-sm">
+              <thead>
+                <tr className="text-left text-gray-600">
+                  <th className="py-2 pr-4">Requested By</th>
+                  <th className="py-2 pr-4">Items</th>
+                  <th className="py-2 pr-4">Total</th>
+                  <th className="py-2 pr-4">Notes</th>
+                  <th className="py-2 pr-4">Created</th>
+                </tr>
+              </thead>
+              <tbody>
+                {budgetReports.map((r) => {
+                  const items = r.data?.items || {};
+                  const total = r.data?.total_amount || 0;
+                  const by = String(r.generated_by || '—');
+                  const created = r.created_at ? new Date(r.created_at).toLocaleString() : '—';
+                  const parts = Object.entries(items)
+                    .filter(([_, v]) => Number(v) > 0)
+                    .map(([k, v]) => `${k}: ${formatUGX(Number(v))}`)
+                    .slice(0, 4);
+                  return (
+                    <tr key={String(r._id || Math.random())} className="border-t">
+                      <td className="py-2 pr-4">{by.substring(0, 6)}…</td>
+                      <td className="py-2 pr-4">{parts.length ? parts.join(', ') : '—'}</td>
+                      <td className="py-2 pr-4 font-medium">{formatUGX(Number(total))}</td>
+                      <td className="py-2 pr-4">{r.data?.notes || '—'}</td>
+                      <td className="py-2 pr-4">{created}</td>
+                    </tr>
+                  );
+                })}
+                {budgetReports.length === 0 && (
+                  <tr>
+                    <td className="py-4 text-gray-500" colSpan={5}>No budget requests submitted yet</td>
                   </tr>
                 )}
               </tbody>

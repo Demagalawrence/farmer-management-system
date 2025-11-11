@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
-import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
-import { Search, MapPin, Edit, UserPlus, X } from 'lucide-react';
+import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, BarChart, Bar, Legend } from 'recharts';
+import { MapPin, UserPlus, X } from 'lucide-react';
 import { useWallpaper } from '../contexts/WallpaperContext';
 import { useAuth } from '../contexts/AuthContext';
 import WallpaperGallery from './WallpaperGallery';
@@ -102,12 +102,22 @@ const FieldOfficerDashboard: React.FC = () => {
         setActionError('Quantity (tons) must be a positive number.');
         return;
       }
-      await harvestService.createHarvest({
+      if (!harvestForm.crop_name || harvestForm.crop_name.trim().length < 2) {
+        setActionError('Please enter a crop name.');
+        return;
+      }
+      const createdRes = await harvestService.createHarvest({
         field_id: harvestForm.field_id as unknown as any,
         farmer_id: harvestForm.farmer_id as unknown as any,
+        crop_name: harvestForm.crop_name as unknown as any,
+        crop: harvestForm.crop_name as unknown as any,
         quantity_tons: qty,
         quality_grade: harvestForm.quality_grade,
       } as any);
+      const created = (createdRes && (createdRes as any).data) ? (createdRes as any).data : createdRes;
+      if (created) {
+        setHarvests((prev) => [created as any, ...(prev || [])]);
+      }
       // Refresh harvests so UI (Recent Activities) reflects the new record immediately
       try {
         const hvs = await harvestService.getAllHarvests();
@@ -118,7 +128,7 @@ const FieldOfficerDashboard: React.FC = () => {
       }
       setActionMessage('✅ Crop/harvest data recorded');
       setShowHarvestModal(false);
-      setHarvestForm({ field_id: '', farmer_id: '', quantity_tons: '', quality_grade: 'A' });
+      setHarvestForm({ field_id: '', farmer_id: '', crop_name: '', quantity_tons: '', quality_grade: 'A' });
     } catch (err) {
       setActionError('Failed to record crop data');
     }
@@ -162,6 +172,37 @@ const FieldOfficerDashboard: React.FC = () => {
       setPaymentForm({ farmer_id: '', amount: '', purpose: '' });
     } catch (err: any) {
       const msg = err?.response?.data?.message || err?.message || 'Failed to request payment';
+      setActionError(msg);
+    }
+  };
+  const submitBudgetRequest = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setActionError('');
+    setActionMessage('');
+    try {
+      const toNum = (v: string) => {
+        const n = parseFloat(v as any);
+        return isNaN(n) ? 0 : n;
+      };
+      const items = {
+        seeds: toNum(budgetForm.seeds),
+        fertilizers: toNum(budgetForm.fertilizers),
+        equipment: toNum(budgetForm.equipment),
+        water: toNum(budgetForm.water),
+        other: toNum(budgetForm.other),
+      };
+      const total_amount = Object.values(items).reduce((a, b) => a + (b as number), 0);
+      await reportService.createReport({
+        type: 'payment_report',
+        date_range_start: new Date(),
+        date_range_end: new Date(),
+        data: { category: 'budget_request', items, total_amount, notes: budgetForm.notes, sent_to: 'finance' },
+      } as any);
+      setActionMessage('✅ Budget request sent to Finance');
+      setShowBudgetModal(false);
+      setBudgetForm({ seeds: '', fertilizers: '', equipment: '', water: '', other: '', notes: '' });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to submit budget request';
       setActionError(msg);
     }
   };
@@ -241,9 +282,11 @@ const FieldOfficerDashboard: React.FC = () => {
   const { currentWallpaper, setWallpaper } = useWallpaper();
   const { logout, user } = useAuth();
   const [showWallpaperGallery, setShowWallpaperGallery] = useState(false);
-  const [searchTerm, setSearchTerm] = useState('');
   const [showRegisterModal, setShowRegisterModal] = useState(false);
   const [showLocationModal, setShowLocationModal] = useState(false);
+  const [actionError, setActionError] = useState('');
+  const [actionMessage, setActionMessage] = useState('');
+  const [paymentForm, setPaymentForm] = useState({ farmer_id: '', amount: '', purpose: '' });
   const [registerForm, setRegisterForm] = useState({
     name: '',
     email: '',
@@ -270,16 +313,16 @@ const FieldOfficerDashboard: React.FC = () => {
   const [activeFields, setActiveFields] = useState<number>(0);
   const [needsAttentionFields, setNeedsAttentionFields] = useState<number>(0);
   const [pendingVerifications, setPendingVerifications] = useState<number>(0);
-  const [visitsScheduled, setVisitsScheduled] = useState<number>(0); // placeholder until endpoint exists
 
   // Action modals visibility
   const [showFieldModal, setShowFieldModal] = useState(false);
   const [showHarvestModal, setShowHarvestModal] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
   const [showPaymentModal, setShowPaymentModal] = useState(false);
+  const [showBudgetModal, setShowBudgetModal] = useState(false);
 
-  // Crops overview tab (category | health)
-  const [overviewTab, setOverviewTab] = useState<'category' | 'health'>('category');
+  
+  const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
 
   // Forms
   const [fieldForm, setFieldForm] = useState({
@@ -292,6 +335,7 @@ const FieldOfficerDashboard: React.FC = () => {
   const [harvestForm, setHarvestForm] = useState({
     field_id: '',
     farmer_id: '',
+    crop_name: '',
     quantity_tons: '',
     quality_grade: 'A' as 'A' | 'B' | 'C'
   });
@@ -301,54 +345,61 @@ const FieldOfficerDashboard: React.FC = () => {
     date_range_end: '',
     notes: ''
   });
-  const [paymentForm, setPaymentForm] = useState({
-    farmer_id: '',
-    amount: '',
-    purpose: ''
+  const [budgetForm, setBudgetForm] = useState({
+    seeds: '',
+    fertilizers: '',
+    equipment: '',
+    water: '',
+    other: '',
+    notes: ''
   });
-  const [actionMessage, setActionMessage] = useState('');
-  const [actionError, setActionError] = useState('');
-
-  // Derived: Crops overview data from actual records
-  const categoryData = React.useMemo(() => {
-    const sums: Record<string, number> = {};
-    const norm = (s: string) => (s || '').toLowerCase();
-    const toCategory = (crop: string): 'Fruits' | 'Vegetables' | 'Grains' | 'Other' => {
-      const c = norm(crop);
-      if (/wheat|barley|rice|corn|maize|oats|millet|grain/.test(c)) return 'Grains';
-      if (/vegetable|tomato|onion|cabbage|carrot|potato|beans|pea|spinach/.test(c)) return 'Vegetables';
-      if (c) return 'Fruits';
-      return 'Other';
+  const budgetTotal = React.useMemo(() => {
+    const n = (v: string) => {
+      const x = parseFloat(v as any);
+      return isNaN(x) ? 0 : x;
     };
+    return n(budgetForm.seeds) + n(budgetForm.fertilizers) + n(budgetForm.equipment) + n(budgetForm.water) + n(budgetForm.other);
+  }, [budgetForm]);
+  // Derived: Monthly harvest quantities (auto, current year)
+  const monthlyBarData = React.useMemo(() => {
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const sums: Record<string, number> = Object.fromEntries(months.map(m => [m, 0]));
+    const now = new Date();
+    const year = now.getFullYear();
     (harvests || []).forEach((h: any) => {
-      const cat = toCategory(h.crop_type || '');
-      const qty = Number(h.quantity_tons || 0);
-      sums[cat] = (sums[cat] || 0) + qty;
+      const d = new Date(h.harvest_date || h.harvestDate || h.date);
+      if (isNaN(d.getTime()) || d.getFullYear() !== year) return;
+      const m = months[d.getMonth()];
+      const qty = Number(h.quantity_tons ?? h.quantityTons ?? h.quantity ?? 0);
+      sums[m] += isNaN(qty) ? 0 : qty;
     });
-    const res = [
-      { name: 'Fruits', value: sums['Fruits'] || 0, color: '#FFA500' },
-      { name: 'Vegetables', value: sums['Vegetables'] || 0, color: '#90EE90' },
-      { name: 'Grains', value: sums['Grains'] || 0, color: '#228B22' },
-    ];
-    // If all zero and no data, keep empty to avoid misleading chart
-    return res.some(d => d.value > 0) ? res : res;
+    return months.map(m => ({ month: m, tons: sums[m] }));
   }, [harvests]);
 
-  const healthData = React.useMemo(() => {
-    const counts: Record<string, number> = { healthy: 0, needs_attention: 0, critical: 0 };
-    (fields || []).forEach((f: any) => {
-      const h = (f.health_status || '').toLowerCase();
-      if (h === 'healthy') counts.healthy += 1;
-      else if (h === 'needs_attention') counts.needs_attention += 1;
-      else if (h === 'critical') counts.critical += 1;
-    });
-    const res = [
-      { name: 'Healthy', value: counts.healthy, color: '#22c55e' },
-      { name: 'Needs Attention', value: counts.needs_attention, color: '#f59e0b' },
-      { name: 'Critical', value: counts.critical, color: '#ef4444' },
-    ];
-    return res;
+  // Robust harvest readiness count (supports various stage spellings)
+  const readyFieldsCount = React.useMemo(() => {
+    const norm = (v: string) => String(v || '').toLowerCase().replace(/[\s-]+/g, '_');
+    // Supported values/aliases considered as ready
+    const readySet = new Set([
+      'harvest_ready',
+      'ready',
+      'ready_to_harvest',
+      'mature',
+      'harvest',
+      'ripe',
+      'harvestready'
+    ]);
+    // Supported property keys to look at
+    const stageKeys = ['crop_stage', 'cropStage', 'stage', 'harvest_stage', 'harvestStage'];
+    return (fields || []).filter((f: any) => {
+      for (const k of stageKeys) {
+        if (k in f && readySet.has(norm((f as any)[k]))) return true;
+      }
+      return false;
+    })?.length || 0;
   }, [fields]);
+
+  
 
   // Fetch data and compute derived stats
   React.useEffect(() => {
@@ -373,8 +424,8 @@ const FieldOfficerDashboard: React.FC = () => {
         const newW = fmArr.filter((f: any) => f.registration_date && new Date(f.registration_date) >= weekAgo).length;
         setNewFarmersWeek(newW);
 
-        // Pending verifications (inactive farmers as proxy)
-        const pending = fmArr.filter((f: any) => f.status === 'inactive').length;
+        // Pending verifications: any farmer not explicitly active (case-insensitive)
+        const pending = fmArr.filter((f: any) => (String(f.status || '').toLowerCase() !== 'active')).length;
         setPendingVerifications(pending);
 
         // Fields
@@ -399,8 +450,7 @@ const FieldOfficerDashboard: React.FC = () => {
         if (!mounted) return;
         setReports(rpArr);
 
-        // Visits scheduled placeholder (0 until endpoint exists)
-        setVisitsScheduled(0);
+        // Visits suggested: count of fields needing attention (derived above)
       } catch (e) {
         if (!mounted) return;
         setFarmerCountError('Failed to load dashboard data');
@@ -455,15 +505,68 @@ const FieldOfficerDashboard: React.FC = () => {
     { date: 'Tue 38', openSoil: 30, low: 55, ideal: 70, high: 25, cloud: 30 }
   ];
 
-  // My crops data - EXACT from your image
-  const myCropsData = [
-    { name: 'Barley', progress: 90, color: '#90EE90', status: 'Excellent' },
-    { name: 'Millet', progress: 65, color: '#90EE90', status: 'Sprouting' },
-    { name: 'Corn', progress: 25, color: '#DEB887', status: 'Planted' },
-    { name: 'Oats', progress: 70, color: '#FFD700', status: 'Sprouting' },
-    { name: 'Rice', progress: 10, color: '#FFA500', status: 'Planted' },
-    { name: 'Wheat', progress: 100, color: '#8B4513', status: 'Harvest' }
-  ];
+  // My Crops derived from data (harvests + fields)
+  const myCropsData = React.useMemo(() => {
+    const norm = (s: any) => String(s || '').trim();
+    const cap = (s: string) => s ? (s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()) : s;
+    const stageNorm = (v: string) => String(v || '').toLowerCase().replace(/\s+/g, '_');
+    const stageToProgress: Record<string, number> = {
+      planted: 25,
+      planting: 25,
+      sprouting: 65,
+      growing: 70,
+      mature: 90,
+      harvest_ready: 100,
+      harvest: 100,
+      ripe: 100,
+    };
+    const stageToLabel: Record<string, string> = {
+      planted: 'Planted',
+      planting: 'Planted',
+      sprouting: 'Sprouting',
+      growing: 'Growing',
+      mature: 'Excellent',
+      harvest_ready: 'Harvest',
+      harvest: 'Harvest',
+      ripe: 'Harvest',
+    };
+    const colorFor = (p: number) => p >= 90 ? '#90EE90' : p >= 70 ? '#FFD700' : p >= 40 ? '#FFA500' : '#DEB887';
+
+    // Map field_id -> stage
+    const fieldStage: Record<string, string> = {};
+    (fields || []).forEach((f: any) => {
+      const id = String(f._id || f.id || '');
+      const st = stageNorm(f.crop_stage || f.stage || f.harvest_stage || '');
+      if (id) fieldStage[id] = st;
+    });
+
+    // Aggregate by crop name taking latest progress per crop
+    const agg: Record<string, { name: string; progress: number; status: string; color: string } > = {};
+    (harvests || []).forEach((h: any) => {
+      const cname = cap(norm(h.crop_name || h.cropName || h.crop));
+      if (!cname) return;
+      const fid = String(h.field_id || h.fieldId || '');
+      const stKey = fieldStage[fid] || '';
+      let progress = stKey ? (stageToProgress[stKey] ?? 40) : 40;
+      // If explicitly harvest record exists, prefer 100
+      if (stKey === 'harvest' || stKey === 'harvest_ready') progress = 100;
+      const status = stKey ? (stageToLabel[stKey] || (progress >= 90 ? 'Excellent' : progress >= 70 ? 'Good' : progress >= 40 ? 'Fair' : 'Needs Attention'))
+                           : (progress >= 90 ? 'Excellent' : progress >= 70 ? 'Good' : progress >= 40 ? 'Fair' : 'Needs Attention');
+      const color = colorFor(progress);
+      if (!(cname in agg) || agg[cname].progress < progress) {
+        agg[cname] = { name: cname, progress, status, color };
+      }
+    });
+
+    // Return array; if empty, show a helpful placeholder
+    const arr = Object.values(agg);
+    if (!arr.length) {
+      return [
+        { name: 'No crops yet', progress: 0, color: '#e5e7eb', status: 'Record Crop Data to see crops here' }
+      ];
+    }
+    return arr.sort((a, b) => b.progress - a.progress).slice(0, 8);
+  }, [harvests, fields]);
 
   const handleWallpaperSelect = (wallpaper: any) => {
     setWallpaper(wallpaper);
@@ -566,19 +669,9 @@ const FieldOfficerDashboard: React.FC = () => {
                 <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
                   <span className="text-white font-bold text-sm">🌾</span>
                 </div>
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">
-                  Farmer ID (optional)
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g., 1"
-                  value={registerForm.external_id}
-                  onChange={(e)=>setRegisterForm({...registerForm, external_id: e.target.value})}
-                  className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-                <p className="text-xs text-gray-500 mt-1">Leave blank to auto-assign the next ID.</p>
-              </div>
+
+      {/* Removed hover zone */}
+
                 <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
                 <span className="text-sm text-gray-500">System</span>
               </div>
@@ -628,26 +721,24 @@ const FieldOfficerDashboard: React.FC = () => {
         {/* EXACT Layout from your image */}
         <div className="flex gap-6">
           {/* Premium Sidebar */}
-          <div className="w-64 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 relative z-10">
-            <nav className="space-y-2">
+          <div
+            className={`w-80 overflow-hidden bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 relative z-10 transition-all duration-300`}
+          >
+            <nav className="space-y-[45px]">
               <div className="flex items-center space-x-3 bg-green-100 text-green-700 px-3 py-2 rounded-lg">
                 <span className="text-sm">📊</span>
-                <span className="font-medium">Dashboard</span>
+                {isSidebarExpanded && <span className="font-medium">Dashboard</span>}
               </div>
-              <button className="w-full flex items-center space-x-3 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors">
-                <span className="text-sm">🌱</span>
-                <span>Add Crops</span>
-              </button>
               <button 
                 onClick={() => setShowLocationModal(true)}
-                className="w-full flex items-center space-x-3 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-50 transition-colors"
+                className="w-full flex items-center space-x-3 text-gray-600 px-5 py-4 rounded-xl hover:bg-gray-50 transition-colors text-base font-semibold"
               >
                 <MapPin className="w-4 h-4" />
-                <span>Add Location</span>
+                {isSidebarExpanded && <span>Add Location</span>}
               </button>
               <button 
                 onClick={() => setShowRegisterModal(true)}
-                className="w-full flex items-center space-x-3 bg-blue-500 hover:bg-blue-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full flex items-center space-x-3 bg-blue-500 hover:bg-blue-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <UserPlus className="w-4 h-4" />
                 <span className="font-medium">Register Farmer</span>
@@ -655,50 +746,45 @@ const FieldOfficerDashboard: React.FC = () => {
               {/* New Actions */}
               <button 
                 onClick={() => setShowFieldModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-green-500 hover:bg-green-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full mt-2 flex items-center space-x-3 bg-green-500 hover:bg-green-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <span className="text-sm">📍</span>
                 <span className="font-medium">Record Field Data</span>
               </button>
               <button 
                 onClick={() => setShowHarvestModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-emerald-500 hover:bg-emerald-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full mt-2 flex items-center space-x-3 bg-emerald-500 hover:bg-emerald-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <span className="text-sm">🌾</span>
                 <span className="font-medium">Record Crop Data</span>
               </button>
               <button 
                 onClick={() => setShowReportModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-indigo-500 hover:bg-indigo-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full mt-2 flex items-center space-x-3 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <span className="text-sm">📄</span>
                 <span className="font-medium">Generate Report</span>
               </button>
               <button 
                 onClick={() => setShowPaymentModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-purple-500 hover:bg-purple-600 text-white px-3 py-2 rounded-lg transition-colors shadow-md"
+                className="w-full mt-2 flex items-center space-x-3 bg-purple-500 hover:bg-purple-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
               >
                 <span className="text-sm">💳</span>
                 <span className="font-medium">Request Payment</span>
+              </button>
+              <button 
+                onClick={() => setShowBudgetModal(true)}
+                className="w-full mt-2 flex items-center space-x-3 bg-amber-500 hover:bg-amber-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
+              >
+                <span className="text-sm">📑</span>
+                <span className="font-medium">Budget Request</span>
               </button>
             </nav>
           </div>
 
           {/* Main Content - EXACT Layout */}
           <div className="flex-1 space-y-6">
-            {/* Premium Search Bar */}
-            <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 relative z-10">
-              <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-5 h-5" />
-                <input
-                  type="text"
-                  placeholder="Search crop here"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                />
-              </div>
-            </div>
+            
 
             {/* Farm Locations (Google Map) */}
             <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
@@ -710,58 +796,7 @@ const FieldOfficerDashboard: React.FC = () => {
               <p className="mt-2 text-xs text-gray-500">Tip: Set VITE_GOOGLE_MAPS_API_KEY in frontend .env to enable Google Maps tiles. Without it, a fallback message will display.</p>
             </div>
 
-            {/* Crops Overview */}
-            <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
-              <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-semibold">Crops Overview</h2>
-                <div className="flex items-center bg-gray-100 rounded-lg text-xs">
-                  <button
-                    className={`px-3 py-1 rounded-l-lg ${overviewTab==='category' ? 'bg-white shadow font-medium' : 'text-gray-600'}`}
-                    onClick={() => setOverviewTab('category')}
-                  >By Category</button>
-                  <button
-                    className={`px-3 py-1 rounded-r-lg ${overviewTab==='health' ? 'bg-white shadow font-medium' : 'text-gray-600'}`}
-                    onClick={() => setOverviewTab('health')}
-                  >By Health</button>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6 items-center">
-                <div className="h-56">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <PieChart>
-                      <Pie
-                        data={overviewTab==='category' ? categoryData : healthData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={50}
-                        outerRadius={80}
-                        dataKey="value"
-                      >
-                        {(overviewTab==='category' ? categoryData : healthData).map((entry:any, index:number) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-                <div className="space-y-3">
-                  {(overviewTab==='category' ? categoryData : healthData).map((item:any, idx:number) => (
-                    <div key={idx} className="flex items-center justify-between">
-                      <div className="flex items-center space-x-2">
-                        <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }}></div>
-                        <span className="text-sm font-medium">{item.name}</span>
-                      </div>
-                      <div className="text-right">
-                        <div className="text-sm font-bold text-gray-900">{Number(item.value).toLocaleString()}</div>
-                        <div className="text-xs text-gray-500">{overviewTab==='category' ? 'tons' : 'fields'}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            </div>
+            
 
             {/* Stats Row */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -824,38 +859,55 @@ const FieldOfficerDashboard: React.FC = () => {
               {/* Recent Activities */}
               <div className="lg:col-span-2 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
                 <h2 className="text-xl font-semibold mb-4">Recent Activities</h2>
-                <div className="space-y-3">
-                  {[
-                    ...farmers.map((f:any)=>({
-                      ts: f.registration_date ? new Date(f.registration_date).getTime() : 0,
-                      label: `Registered farmer: ${f.name ?? '—'}`,
-                      tag: 'farmer'
-                    })),
-                    ...fields.map((fl:any)=>({
-                      ts: fl.created_at ? new Date(fl.created_at).getTime() : 0,
-                      label: `New field at ${fl.location ?? '—'}`,
-                      tag: 'field'
-                    })),
-                    ...harvests.map((h:any)=>({
-                      ts: h.harvest_date ? new Date(h.harvest_date).getTime() : 0,
-                      label: `Harvest recorded: ${h.quantity_tons ?? 0} tons`,
-                      tag: 'harvest'
-                    })),
-                    ...reports.map((r:any)=>({
-                      ts: r.created_at ? new Date(r.created_at).getTime() : 0,
-                      label: `Report generated: ${r.type}`,
-                      tag: 'report'
-                    })),
-                  ]
-                  .filter(a=>a.ts>0)
-                  .sort((a,b)=>b.ts-a.ts)
-                  .slice(0,6)
-                  .map((a,idx)=> (
-                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                      <div className="text-sm text-gray-800">{a.label}</div>
-                      <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-700">{a.tag}</span>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  <div className="space-y-3">
+                    {[
+                      ...farmers.map((f:any)=>({
+                        ts: f.registration_date ? new Date(f.registration_date).getTime() : 0,
+                        label: `Registered farmer: ${f.name ?? '—'}`,
+                        tag: 'farmer'
+                      })),
+                      ...fields.map((fl:any)=>({
+                        ts: fl.created_at ? new Date(fl.created_at).getTime() : 0,
+                        label: `New field at ${fl.location ?? '—'}`,
+                        tag: 'field'
+                      })),
+                      ...harvests.map((h:any)=>({
+                        ts: h.harvest_date ? new Date(h.harvest_date).getTime() : 0,
+                        label: `Harvest recorded: ${h.quantity_tons ?? 0} tons`,
+                        tag: 'harvest'
+                      })),
+                      ...reports.map((r:any)=>({
+                        ts: r.created_at ? new Date(r.created_at).getTime() : 0,
+                        label: `Report generated: ${r.type}`,
+                        tag: 'report'
+                      })),
+                    ]
+                    .filter(a=>a.ts>0)
+                    .sort((a,b)=>b.ts-a.ts)
+                    .slice(0,6)
+                    .map((a,idx)=> (
+                      <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                        <div className="text-sm text-gray-800">{a.label}</div>
+                        <span className="text-xs px-2 py-0.5 rounded bg-gray-200 text-gray-700">{a.tag}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <div>
+                    <div className="h-64">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={monthlyBarData}>
+                          <CartesianGrid strokeDasharray="3 3" />
+                          <XAxis dataKey="month" />
+                          <YAxis />
+                          <Tooltip />
+                          <Legend />
+                          <Bar dataKey="tons" name="Quantity (tons)" fill="#22c55e" radius={[4,4,0,0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </div>
-                  ))}
+                    <div className="mt-2 text-xs text-gray-500">This year monthly harvest (tons)</div>
+                  </div>
                 </div>
               </div>
 
@@ -868,8 +920,8 @@ const FieldOfficerDashboard: React.FC = () => {
                     <span className="font-semibold">{pendingVerifications}</span>
                   </div>
                   <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span>Field visits scheduled</span>
-                    <span className="font-semibold">{visitsScheduled}</span>
+                    <span>Visits suggested</span>
+                    <span className="font-semibold">{needsAttentionFields}</span>
                   </div>
                 </div>
               </div>
@@ -884,105 +936,13 @@ const FieldOfficerDashboard: React.FC = () => {
               </div>
               <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
                 <p className="text-sm text-gray-500">Harvest Readiness</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">Ready: {fields.filter((x:any)=>x.crop_stage==='harvest_ready').length}</p>
+                <p className="mt-1 text-2xl font-semibold text-gray-900">Ready: {readyFieldsCount}</p>
                 <button onClick={()=>setShowReportModal(true)} className="mt-3 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Generate</button>
               </div>
               <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
                 <p className="text-sm text-gray-500">Input Needs</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">Needs: {needsAttentionFields}</p>
                 <button onClick={()=>setShowReportModal(true)} className="mt-3 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Generate</button>
-              </div>
-            </div>
-
-            {/* Top Row - Crops Overview and Farm Image - EXACT Layout */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              {/* Premium Crops Overview */}
-              <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-8 relative z-10 hover:shadow-3xl transition-all duration-300">
-                <h2 className="text-xl font-semibold mb-4">Crops Overview</h2>
-                
-                {/* Toggle buttons - EXACT from your image */}
-                <div className="flex bg-gray-100 rounded-lg p-1 mb-6">
-                  <button className="flex-1 py-2 px-4 bg-white rounded-md shadow-sm text-sm font-medium">
-                    By Category
-                  </button>
-                  <button className="flex-1 py-2 px-4 text-sm font-medium text-gray-600">
-                    By Health
-                  </button>
-                </div>
-
-                {/* Pie Chart - EXACT positioning */}
-                <div className="h-64 mb-4 flex justify-center">
-                  <ResponsiveContainer width={200} height={200}>
-                    <PieChart width={200} height={200}>
-                      <Pie
-                        data={cropCategoryData}
-                        cx="50%"
-                        cy="50%"
-                        innerRadius={60}
-                        outerRadius={100}
-                        dataKey="value"
-                      >
-                        {cropCategoryData.map((entry, index) => (
-                          <Cell key={`cell-${index}`} fill={entry.color} />
-                        ))}
-                      </Pie>
-                      <Tooltip />
-                    </PieChart>
-                  </ResponsiveContainer>
-                </div>
-
-                {/* Legend - EXACT from your image */}
-                <div className="space-y-2">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-orange-500"></div>
-                      <span className="text-sm font-medium">Fruits</span>
-                    </div>
-                    <span className="text-sm text-gray-600">14,600</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-green-400"></div>
-                      <span className="text-sm font-medium">Vegetables</span>
-                    </div>
-                    <span className="text-sm text-gray-600">2,700</span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center space-x-2">
-                      <div className="w-3 h-3 rounded-full bg-green-600"></div>
-                      <span className="text-sm font-medium">Grains</span>
-                    </div>
-                    <span className="text-sm text-gray-600">364,500</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Farm Image - EXACT from your image */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
-                <div className="relative h-64 bg-green-200 rounded-lg overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-br from-green-300 to-green-500"></div>
-                  <div className="absolute top-4 right-4 bg-white rounded-lg p-3 shadow-sm">
-                    <div className="flex items-center space-x-2 mb-2">
-                      <MapPin className="w-4 h-4 text-gray-600" />
-                      <span className="text-sm font-medium">Malakwal Farm</span>
-                      <Edit className="w-4 h-4 text-gray-400" />
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 text-xs">
-                      <div className="text-center">
-                        <div className="text-gray-600">Crop Health</div>
-                        <div className="font-medium text-green-600">Good</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-gray-600">Sowing Date</div>
-                        <div className="font-medium">Feb 21, 2024</div>
-                      </div>
-                      <div className="text-center">
-                        <div className="text-gray-600">Harvest Date</div>
-                        <div className="font-medium">Apr 25, 2024</div>
-                      </div>
-                    </div>
-                  </div>
-                </div>
               </div>
             </div>
 
@@ -1265,6 +1225,7 @@ const FieldOfficerDashboard: React.FC = () => {
             <form onSubmit={submitHarvestData} className="space-y-4">
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Field ID" value={harvestForm.field_id} onChange={(e)=>setHarvestForm({...harvestForm, field_id: e.target.value})} required />
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Farmer ID" value={harvestForm.farmer_id} onChange={(e)=>setHarvestForm({...harvestForm, farmer_id: e.target.value})} required />
+              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Crop Name (e.g., Maize)" value={harvestForm.crop_name} onChange={(e)=>setHarvestForm({...harvestForm, crop_name: e.target.value})} required />
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Quantity (tons)" value={harvestForm.quantity_tons} onChange={(e)=>setHarvestForm({...harvestForm, quantity_tons: e.target.value})} required />
               <select className="w-full px-4 py-2 border rounded-lg" value={harvestForm.quality_grade} onChange={(e)=>setHarvestForm({...harvestForm, quality_grade: e.target.value as any})}>
                 <option value="A">A</option>
@@ -1327,6 +1288,71 @@ const FieldOfficerDashboard: React.FC = () => {
               <div className="flex space-x-3 pt-2">
                 <button type="button" onClick={()=>setShowPaymentModal(false)} className="flex-1 px-4 py-3 border rounded-lg">Cancel</button>
                 <button type="submit" className="flex-1 px-4 py-3 bg-purple-600 text-white rounded-lg">Send</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Budget Request Modal */}
+      {showBudgetModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-[9999]">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full mx-4 max-h-[90vh] overflow-y-auto relative z-[10000]">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">📑 Budget Request</h2>
+              <button onClick={() => setShowBudgetModal(false)} className="text-gray-400 hover:text-gray-600 transition-colors">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+
+            <form onSubmit={submitBudgetRequest} className="space-y-4">
+              {[
+                { key: 'seeds', label: 'Seeds' },
+                { key: 'fertilizers', label: 'Fertilizers' },
+                { key: 'equipment', label: 'Equipment' },
+                { key: 'water', label: 'Water' },
+                { key: 'other', label: 'Other' },
+              ].map(({ key, label }) => (
+                <div key={key}>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">{label} (amount)</label>
+                  <input
+                    type="number"
+                    min="0"
+                    step="0.01"
+                    value={(budgetForm as any)[key]}
+                    onChange={(e) => setBudgetForm({ ...budgetForm, [key]: e.target.value } as any)}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                    placeholder="0.00"
+                  />
+                </div>
+              ))}
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Notes</label>
+                <textarea
+                  value={budgetForm.notes}
+                  onChange={(e) => setBudgetForm({ ...budgetForm, notes: e.target.value })}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-amber-500 focus:border-transparent"
+                  placeholder="Describe purpose, timeframe, supplier, etc."
+                  rows={3}
+                />
+              </div>
+
+              <div className="flex items-center justify-between p-3 bg-amber-50 border border-amber-200 rounded-lg">
+                <span className="text-sm font-medium text-amber-800">Total</span>
+                <span className="text-lg font-bold text-amber-900">{budgetTotal.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+              </div>
+
+              {actionError && (
+                <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg text-sm">{actionError}</div>
+              )}
+              {actionMessage && (
+                <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-lg text-sm">{actionMessage}</div>
+              )}
+
+              <div className="flex justify-end space-x-3">
+                <button type="button" onClick={() => setShowBudgetModal(false)} className="px-4 py-2 rounded-lg border border-gray-300 text-gray-700">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white font-medium">Send to Finance</button>
               </div>
             </form>
           </div>

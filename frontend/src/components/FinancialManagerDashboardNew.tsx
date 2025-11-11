@@ -5,6 +5,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { paymentService } from '../services/paymentService';
 import { farmerService } from '../services/farmerService';
 import { formatUGX } from '../utils/currency';
+import { reportService } from '../services/reportService';
 
 const FinancialManagerDashboard: React.FC = () => {
   const { logout } = useAuth();
@@ -20,6 +21,32 @@ const FinancialManagerDashboard: React.FC = () => {
   const [payMethod, setPayMethod] = React.useState<'cash' | 'bank_transfer' | 'mobile_money' | 'check'>('bank_transfer');
   const [payRef, setPayRef] = React.useState('');
   const [highlightApproved, setHighlightApproved] = React.useState(false);
+  const [showBudgetModal, setShowBudgetModal] = React.useState(false);
+  const [budgetReports, setBudgetReports] = React.useState<any[]>([]);
+  const [budgetLoading, setBudgetLoading] = React.useState(false);
+  const [budgetError, setBudgetError] = React.useState('');
+  const [showPlanModal, setShowPlanModal] = React.useState(false);
+  const [planningRequest, setPlanningRequest] = React.useState<any | null>(null);
+  const [planForm, setPlanForm] = React.useState<{seeds:string; fertilizers:string; equipment:string; water:string; other:string}>({seeds:'', fertilizers:'', equipment:'', water:'', other:''});
+  const [lastPlan, setLastPlan] = React.useState<{
+    requested: Record<string, number>;
+    approved: Record<string, number>;
+  } | null>(null);
+  const [showReportModal, setShowReportModal] = React.useState(false);
+  const [showInvoiceModal, setShowInvoiceModal] = React.useState(false);
+  const [reportForm, setReportForm] = React.useState({
+    type: 'performance' as 'harvest_summary' | 'payment_report' | 'performance',
+    date_range_start: '',
+    date_range_end: '',
+    notes: ''
+  });
+  const [invoiceForm, setInvoiceForm] = React.useState({
+    title: 'Invoice',
+    amount: '',
+    notes: ''
+  });
+  const [actionError, setActionError] = React.useState('');
+  const [actionMessage, setActionMessage] = React.useState('');
 
   // Helpers and derived finance statistics
   const currency = (n: number) => formatUGX(n);
@@ -101,12 +128,57 @@ const FinancialManagerDashboard: React.FC = () => {
     }
   };
   const handleGenerateInvoice = () => {
-    // TODO: Implement invoice generation flow
-    alert('Generate Invoice: This feature will open the invoice creation flow.');
+    setActionError('');
+    setActionMessage('');
+    setShowInvoiceModal(true);
   };
   const handleFinancialReport = () => {
-    // TODO: Implement report generation/navigation
-    alert('Financial Report: This will open the reporting module.');
+    setActionError('');
+    setActionMessage('');
+    setShowReportModal(true);
+  };
+  const submitFinancialReport = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setActionError('');
+      setActionMessage('');
+      await reportService.createReport({
+        type: reportForm.type,
+        date_range_start: new Date(reportForm.date_range_start) as any,
+        date_range_end: new Date(reportForm.date_range_end) as any,
+        data: { notes: reportForm.notes, sent_to: 'manager' },
+      } as any);
+      setActionMessage('✅ Financial report sent to Manager');
+      setShowReportModal(false);
+      setReportForm({ type: 'performance', date_range_start: '', date_range_end: '', notes: '' });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to send report';
+      setActionError(msg);
+    }
+  };
+  const submitInvoice = async (e: React.FormEvent) => {
+    e.preventDefault();
+    try {
+      setActionError('');
+      setActionMessage('');
+      const amt = parseFloat(invoiceForm.amount as any);
+      if (isNaN(amt) || amt <= 0) {
+        setActionError('Amount must be a positive number');
+        return;
+      }
+      await reportService.createReport({
+        type: 'payment_report',
+        date_range_start: new Date() as any,
+        date_range_end: new Date() as any,
+        data: { category: 'invoice', title: invoiceForm.title, amount: amt, notes: invoiceForm.notes, sent_to: 'manager' },
+      } as any);
+      setActionMessage('✅ Invoice sent to Manager');
+      setShowInvoiceModal(false);
+      setInvoiceForm({ title: 'Invoice', amount: '', notes: '' });
+    } catch (err: any) {
+      const msg = err?.response?.data?.message || err?.message || 'Failed to send invoice';
+      setActionError(msg);
+    }
   };
   const handleProcessPayments = () => {
     if (!approvedPayments || approvedPayments.length === 0) {
@@ -117,9 +189,30 @@ const FinancialManagerDashboard: React.FC = () => {
     setHighlightApproved(true);
     setTimeout(() => setHighlightApproved(false), 1500);
   };
+  const loadBudgetRequests = async () => {
+    try {
+      setBudgetLoading(true);
+      setBudgetError('');
+      const byType = await reportService.getReportsByType('payment_report');
+      const list = Array.isArray(byType) ? byType : (byType?.data || byType?.items || []);
+      let budgets = list.filter((r: any) => String(r.type) === 'payment_report' && (r.data?.category === 'budget_request' || r.data?.sent_to === 'finance'));
+      if (!budgets.length) {
+        try {
+          const allRes = await reportService.getAllReports();
+          const all = Array.isArray(allRes) ? allRes : (allRes?.data || allRes?.items || []);
+          budgets = all.filter((r: any) => String(r.type) === 'payment_report' && (r.data?.category === 'budget_request' || r.data?.sent_to === 'finance'));
+        } catch {}
+      }
+      setBudgetReports(budgets);
+    } catch (e) {
+      setBudgetError('Failed to load budget requests');
+    } finally {
+      setBudgetLoading(false);
+    }
+  };
   const handleBudgetPlanning = () => {
-    // TODO: Implement budget planning navigation/modal
-    alert('Budget Planning: This will open the budget planning module.');
+    setShowBudgetModal(true);
+    loadBudgetRequests();
   };
   // Financial KPIs data
   const financialKPIs = [
@@ -146,13 +239,18 @@ const FinancialManagerDashboard: React.FC = () => {
   ];
 
   // Budget allocation data
-  const budgetData = [
-    { category: 'Seeds & Fertilizers', allocated: 450000, spent: 420000, percentage: 93 },
-    { category: 'Equipment', allocated: 300000, spent: 285000, percentage: 95 },
-    { category: 'Labor', allocated: 600000, spent: 580000, percentage: 97 },
-    { category: 'Utilities', allocated: 150000, spent: 135000, percentage: 90 },
-    { category: 'Maintenance', allocated: 200000, spent: 175000, percentage: 88 }
-  ];
+  const initialBudgetData = React.useMemo(() => ([
+    { key: 'seeds', category: 'Seeds', allocated: 250000, spent: 0 },
+    { key: 'fertilizers', category: 'Fertilizers', allocated: 200000, spent: 0 },
+    { key: 'equipment', category: 'Equipment', allocated: 300000, spent: 0 },
+    { key: 'water', category: 'Water', allocated: 150000, spent: 0 },
+    { key: 'other', category: 'Other', allocated: 200000, spent: 0 }
+  ]), []);
+  const [budgetData, setBudgetData] = React.useState(initialBudgetData);
+  const computedBudgetData = React.useMemo(() => budgetData.map(b => ({
+    ...b,
+    percentage: Math.min(100, Math.round((Number(b.spent||0) / Math.max(1, Number(b.allocated||0))) * 100))
+  })), [budgetData]);
 
   // Payment status data (live)
   const paymentStatusData = React.useMemo(() => {
@@ -450,20 +548,29 @@ const FinancialManagerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Budget Allocation */}
+            {/* Budget Allocation (live, updates when you plan) */}
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold mb-6">Budget Allocation</h2>
               
               <div className="space-y-6">
-                {budgetData.map((item, index) => (
+                {computedBudgetData.map((item, index) => {
+                  const reqForItem = lastPlan?.requested?.[item.key as string] ?? null;
+                  const apprForItem = lastPlan?.approved?.[item.key as string] ?? null;
+                  const savedVal = (reqForItem !== null && apprForItem !== null)
+                    ? Math.max(0, Number(reqForItem) - Number(apprForItem))
+                    : Math.max(0, Number(item.allocated) - Number(item.spent));
+                  return (
                   <div key={index} className="space-y-2">
                     <div className="flex justify-between items-center">
                       <span className="text-sm font-medium text-gray-700">{item.category}</span>
                       <div className="text-right">
                         <span className="text-sm font-bold text-gray-900">
-                          {formatUGX(item.spent)} / {formatUGX(item.allocated)}
+                          {formatUGX(Number(item.spent))} / {formatUGX(Number(item.allocated))}
                         </span>
                         <div className="text-xs text-gray-500">{item.percentage}% utilized</div>
+                        {reqForItem !== null && (
+                          <div className="text-[11px] text-gray-500">Requested: {formatUGX(Number(reqForItem))} · Approved: {formatUGX(Number(apprForItem||0))}</div>
+                        )}
                       </div>
                     </div>
                     <div className="w-full bg-gray-200 rounded-full h-3">
@@ -475,8 +582,10 @@ const FinancialManagerDashboard: React.FC = () => {
                         style={{ width: `${item.percentage}%` }}
                       ></div>
                     </div>
+                    <div className="flex justify-end"><div className="text-xs text-gray-500">Saved: {formatUGX(savedVal)}</div></div>
                   </div>
-                ))}
+                  );
+                })}
               </div>
             </div>
 
@@ -616,6 +725,219 @@ const FinancialManagerDashboard: React.FC = () => {
         </div>
       </div>
       </div>
+
+      {showReportModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Send Financial Report</h3>
+              <button onClick={() => setShowReportModal(false)} className="px-3 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm">Close</button>
+            </div>
+            <form onSubmit={submitFinancialReport} className="space-y-3">
+              <select className="w-full border rounded px-3 py-2" value={reportForm.type} onChange={(e)=>setReportForm({...reportForm, type: e.target.value as any})}>
+                <option value="performance">Performance</option>
+                <option value="payment_report">Payment Report</option>
+                <option value="harvest_summary">Harvest Summary</option>
+              </select>
+              <input type="date" className="w-full border rounded px-3 py-2" value={reportForm.date_range_start} onChange={(e)=>setReportForm({...reportForm, date_range_start: e.target.value})} required />
+              <input type="date" className="w-full border rounded px-3 py-2" value={reportForm.date_range_end} onChange={(e)=>setReportForm({...reportForm, date_range_end: e.target.value})} required />
+              <textarea className="w-full border rounded px-3 py-2" rows={3} placeholder="Notes" value={reportForm.notes} onChange={(e)=>setReportForm({...reportForm, notes: e.target.value})} />
+              {actionError && <div className="text-sm text-red-600">{actionError}</div>}
+              {actionMessage && <div className="text-sm text-green-600">{actionMessage}</div>}
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={()=>setShowReportModal(false)} className="px-4 py-2 rounded bg-gray-200 text-gray-800">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white">Send to Manager</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showInvoiceModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold">Generate Invoice</h3>
+              <button onClick={() => setShowInvoiceModal(false)} className="px-3 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm">Close</button>
+            </div>
+            <form onSubmit={submitInvoice} className="space-y-3">
+              <input className="w-full border rounded px-3 py-2" placeholder="Title" value={invoiceForm.title} onChange={(e)=>setInvoiceForm({...invoiceForm, title: e.target.value})} />
+              <input className="w-full border rounded px-3 py-2" placeholder="Amount" value={invoiceForm.amount} onChange={(e)=>setInvoiceForm({...invoiceForm, amount: e.target.value})} />
+              <textarea className="w-full border rounded px-3 py-2" rows={3} placeholder="Notes" value={invoiceForm.notes} onChange={(e)=>setInvoiceForm({...invoiceForm, notes: e.target.value})} />
+              {actionError && <div className="text-sm text-red-600">{actionError}</div>}
+              {actionMessage && <div className="text-sm text-green-600">{actionMessage}</div>}
+              <div className="flex justify-end gap-2">
+                <button type="button" onClick={()=>setShowInvoiceModal(false)} className="px-4 py-2 rounded bg-gray-200 text-gray-800">Cancel</button>
+                <button type="submit" className="px-4 py-2 rounded bg-green-600 hover:bg-green-700 text-white">Send to Manager</button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {showBudgetModal && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-3xl max-h-[85vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Budget Planning — Submitted Requests</h3>
+              <button onClick={() => setShowBudgetModal(false)} className="px-3 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm">Close</button>
+            </div>
+
+            {budgetLoading && <div className="text-sm text-gray-600">Loading budget requests…</div>}
+            {budgetError && <div className="text-sm text-red-600 mb-3">{budgetError}</div>}
+
+            {!budgetLoading && !budgetError && (
+              <div className="space-y-4">
+                {budgetReports.length === 0 ? (
+                  <div className="text-sm text-gray-600">No budget requests submitted yet.</div>
+                ) : (
+                  budgetReports.map((r: any) => {
+                    const items = r.data?.items || {};
+                    const total = Number(r.data?.total_amount || 0);
+                    const created = r.created_at ? new Date(r.created_at).toLocaleString() : '—';
+                    const by = String(r.generated_by || '—');
+                    const entries = Object.entries(items)
+                      .filter(([_, v]) => Number(v) > 0)
+                      .map(([k, v]) => ({ key: k, value: Number(v) }));
+                    return (
+                      <div key={String(r._id || Math.random())} className="border rounded-lg p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <div className="text-sm text-gray-700">From: <span className="font-medium">{by.substring(0,6)}…</span></div>
+                          <div className="text-xs text-gray-500">{created}</div>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div className="space-y-1">
+                            {entries.slice(0,6).map((e) => (
+                              <div key={e.key} className="flex justify-between">
+                                <span className="text-gray-600 capitalize">{e.key}</span>
+                                <span className="font-medium">{formatUGX(e.value)}</span>
+                              </div>
+                            ))}
+                          </div>
+                          <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 flex items-center justify-between">
+                            <span className="text-sm font-medium text-amber-800">Total</span>
+                            <span className="text-lg font-bold text-amber-900">{formatUGX(total)}</span>
+                          </div>
+                        </div>
+                        {r.data?.notes && (
+                          <div className="mt-2 text-xs text-gray-600">Notes: {r.data.notes}</div>
+                        )}
+                        <div className="mt-3 flex justify-end gap-2">
+                          <button className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm" onClick={() => {
+                            setPlanningRequest(r);
+                            const it = r?.data?.items || {};
+                            setPlanForm({
+                              seeds: String(it.seeds || ''),
+                              fertilizers: String(it.fertilizers || ''),
+                              equipment: String(it.equipment || ''),
+                              water: String(it.water || ''),
+                              other: String(it.other || ''),
+                            });
+                            setShowPlanModal(true);
+                          }}>Start Planning</button>
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {showPlanModal && planningRequest && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
+          <div className="bg-white rounded-xl shadow-2xl w-full max-w-xl max-h-[85vh] overflow-y-auto p-6">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-xl font-semibold">Plan Budget for Request</h3>
+              <button onClick={() => setShowPlanModal(false)} className="px-3 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm">Close</button>
+            </div>
+
+            <div className="space-y-4">
+              {([
+                { key: 'seeds', label: 'Seeds', mapTo: 'seeds' },
+                { key: 'fertilizers', label: 'Fertilizers', mapTo: 'fertilizers' },
+                { key: 'equipment', label: 'Equipment', mapTo: 'equipment' },
+                { key: 'water', label: 'Water', mapTo: 'water' },
+                { key: 'other', label: 'Other', mapTo: 'other' },
+              ] as const).map(({ key, label, mapTo }) => {
+                const requested = Number((planningRequest?.data?.items || {})[key] || 0);
+                const val = planForm[key as keyof typeof planForm] || '';
+                const cat = (budgetData.find(b => b.key === mapTo) as any) || { allocated: 0, spent: 0 };
+                const planned = Number(val || 0);
+                const remaining = Math.max(0, Number(cat.allocated) - (Number(cat.spent) + planned));
+                return (
+                  <div key={key} className="border rounded-lg p-3">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-medium">{label}</div>
+                      <div className="text-xs text-gray-600">Requested: {formatUGX(requested)}</div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3 items-end">
+                      <div>
+                        <label className="block text-xs text-gray-600 mb-1">Approve Amount</label>
+                        <input
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={val}
+                          onChange={(e)=> setPlanForm({ ...planForm, [key]: e.target.value })}
+                          className="w-full px-3 py-2 border rounded"
+                          placeholder="0"
+                        />
+                      </div>
+                      <div className="text-xs text-gray-600 md:text-right">
+                        Remaining in {cat.category || 'category'}: <span className="font-medium">{formatUGX(remaining)}</span>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+
+            <div className="mt-4 flex justify-end gap-2">
+              <button onClick={() => setShowPlanModal(false)} className="px-4 py-2 rounded bg-gray-200 text-gray-800">Cancel</button>
+              <button
+                onClick={() => {
+                  // Apply planned amounts to budgetData categories
+                  const toNum = (v:string)=>{ const n = parseFloat(v as any); return isNaN(n)?0:n; };
+                  const adds = {
+                    seeds: toNum(planForm.seeds),
+                    fertilizers: toNum(planForm.fertilizers),
+                    equipment: toNum(planForm.equipment),
+                    water: toNum(planForm.water),
+                    other: toNum(planForm.other),
+                  } as Record<string, number>;
+                  setBudgetData(prev => prev.map(b => ({
+                    ...b,
+                    spent: Number(b.spent) + (adds[b.key as keyof typeof adds] || 0)
+                  })));
+                  // Track requested vs approved for savings display
+                  const reqItems = (planningRequest?.data?.items || {}) as Record<string, number>;
+                  setLastPlan({
+                    requested: {
+                      seeds: Number(reqItems.seeds || 0),
+                      fertilizers: Number(reqItems.fertilizers || 0),
+                      equipment: Number(reqItems.equipment || 0),
+                      water: Number(reqItems.water || 0),
+                      other: Number(reqItems.other || 0),
+                    },
+                    approved: {
+                      seeds: adds.seeds,
+                      fertilizers: adds.fertilizers,
+                      equipment: adds.equipment,
+                      water: adds.water,
+                      other: adds.other,
+                    }
+                  });
+                  setShowPlanModal(false);
+                }}
+                className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+              >Save Plan</button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {showProcessModal && selectedPayment && (
         <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">

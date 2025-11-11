@@ -275,3 +275,41 @@
 {"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 22:16:55"}
 {"level":"info","message":"User logged in: jamal@gmail.com","timestamp":"2025-11-06 22:18:07"}
 {"ip":"::1","level":"error","message":"Access code is required for this role","method":"POST","stack":"Error: Access code is required for this role\n    at C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\src\\controllers\\authController.ts:75:13\n    at C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\src\\middleware\\errorHandler.ts:70:21\n    at Layer.handleRequest (C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n    at next (C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n    at C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\src\\middleware\\validation.ts:191:5\n    at Layer.handleRequest (C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)\n    at next (C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\node_modules\\router\\lib\\route.js:157:13)\n    at Route.dispatch (C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\node_modules\\router\\lib\\route.js:117:3)\n    at handle (C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\node_modules\\router\\index.js:435:11)\n    at Layer.handleRequest (C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\node_modules\\router\\lib\\layer.js:152:17)","timestamp":"2025-11-06 22:18:46","url":"/api/auth/register"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 17:51:44"}
+{"level":"info","message":"User logged in: finance1@gmail.com","timestamp":"2025-11-06 17:55:50"}
+{"level":"info","message":"User logged in: mag@gmial.com","timestamp":"2025-11-06 17:57:00"}
+{"level":"info","message":"User logged in: buayism@gmail.com","timestamp":"2025-11-06 17:59:18"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 18:53:03"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 19:20:38"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 19:36:35"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-06 20:26:30"}
+{"level":"info","message":"User logged in: mag@gmial.com","timestamp":"2025-11-06 20:37:52"}
+{"level":"info","message":"User logged in: finance1@gmail.com","timestamp":"2025-11-06 20:39:48"}
+{"level":"info","message":"User logged in: buayism@gmail.com","timestamp":"2025-11-06 20:41:01"}
+{"level":"info","message":"User logged in: mag@gmial.com","timestamp":"2025-11-06 20:41:47"}
+{"level":"info","message":"User logged in: buayism@gmail.com","timestamp":"2025-11-06 20:41:57"}
