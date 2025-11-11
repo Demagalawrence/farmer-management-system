@@ -6,7 +6,9 @@ import { paymentService } from '../services/paymentService';
 import { financeService } from '../services/financeService';
 import { harvestService } from '../services/harvestService';
 import { farmerService } from '../services/farmerService';
+import { fieldService } from '../services/fieldService';
 import { formatUGX } from '../utils/currency';
+import { AddCropModal, NewFarmModal, AddWorkerModal, ReportsModal } from './ManagerModals';
 
 const ManagerDashboard: React.FC = () => {
   const { logout } = useAuth();
@@ -23,6 +25,20 @@ const ManagerDashboard: React.FC = () => {
   const [ratesError, setRatesError] = React.useState('');
   const [ratesData, setRatesData] = React.useState<{ farmerId: string; totalQuantity: number; harvests: any[]; lastDate?: string } | null>(null);
   const [farmers, setFarmers] = React.useState<any[]>([]);
+  const [fields, setFields] = React.useState<any[]>([]);
+  
+  // Quick Actions Modals
+  const [showAddCropModal, setShowAddCropModal] = React.useState(false);
+  const [showNewFarmModal, setShowNewFarmModal] = React.useState(false);
+  const [showAddWorkerModal, setShowAddWorkerModal] = React.useState(false);
+  const [showReportsModal, setShowReportsModal] = React.useState(false);
+  
+  // Form states
+  const [cropForm, setCropForm] = React.useState({ farmer_id: '', field_id: '', quantity_tons: '', quality_grade: 'A', harvest_date: '', crop_type: '' });
+  const [farmForm, setFarmForm] = React.useState({ name: '', email: '', phone: '', address: '', farm_size: '' });
+  const [workerForm, setWorkerForm] = React.useState({ name: '', email: '', password: '', role: 'field_officer' });
+  const [formError, setFormError] = React.useState('');
+  const [formSuccess, setFormSuccess] = React.useState('');
 
   React.useEffect(() => {
     let mounted = true;
@@ -30,18 +46,20 @@ const ManagerDashboard: React.FC = () => {
       try {
         setPpLoading(true);
         setPpError('');
-        const [pendingRes, approvalsRes, allPaysRes, farmersRes, harvestsRes] = await Promise.all([
+        const [pendingRes, approvalsRes, allPaysRes, farmersRes, harvestsRes, fieldsRes] = await Promise.all([
           paymentService.getPaymentsByStatus('pending'),
           financeService.getApprovalRequests('pending'),
           paymentService.getAllPayments(),
           farmerService.getAllFarmers(),
           harvestService.getAllHarvests(),
+          fieldService.getAllFields(),
         ]);
         if (!mounted) return;
         setPendingPayments(Array.isArray(pendingRes) ? pendingRes : (pendingRes?.items || []));
         setApprovals(approvalsRes?.data || approvalsRes || []);
         setAllPayments(allPaysRes?.data || allPaysRes || []);
         setFarmers(farmersRes?.data || farmersRes || []);
+        setFields(fieldsRes?.data || fieldsRes || []);
         const hvArr = Array.isArray(harvestsRes) ? harvestsRes : (harvestsRes?.data || harvestsRes?.items || []);
         setRecentHarvests(hvArr
           .slice()
@@ -147,6 +165,79 @@ const ManagerDashboard: React.FC = () => {
       setRatesError('Failed to load work rates');
     } finally {
       setRatesLoading(false);
+    }
+  };
+
+  // Handle Add Crop submission
+  const handleAddCrop = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    setFormSuccess('');
+    try {
+      await harvestService.createHarvest({
+        farmer_id: cropForm.farmer_id,
+        field_id: cropForm.field_id,
+        quantity_tons: parseFloat(cropForm.quantity_tons),
+        quality_grade: cropForm.quality_grade as 'A' | 'B' | 'C',
+        harvest_date: cropForm.harvest_date || new Date().toISOString(),
+        crop_type: cropForm.crop_type,
+      } as any);
+      setFormSuccess('Harvest added successfully!');
+      setCropForm({ farmer_id: '', field_id: '', quantity_tons: '', quality_grade: 'A', harvest_date: '', crop_type: '' });
+      setTimeout(() => {
+        setShowAddCropModal(false);
+        setFormSuccess('');
+        window.location.reload();
+      }, 1500);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to add harvest');
+    }
+  };
+
+  // Handle New Farm submission
+  const handleNewFarm = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    setFormSuccess('');
+    try {
+      const password = 'Farmer' + Math.random().toString(36).substring(2, 10) + '1';
+      const userResponse = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify({ name: farmForm.name, email: farmForm.email, password: password, role: 'farmer' })
+      });
+      const userData = await userResponse.json();
+      if (!userResponse.ok) throw new Error(userData.message || 'Failed to create user account');
+      await farmerService.createFarmer({
+        name: farmForm.name, user_id: userData.userId, phone: farmForm.phone,
+        address: farmForm.address, farm_size: parseFloat(farmForm.farm_size), status: 'active'
+      } as any);
+      setFormSuccess(`Farmer registered! Login: ${farmForm.email} / ${password}`);
+      setFarmForm({ name: '', email: '', phone: '', address: '', farm_size: '' });
+      setTimeout(() => { setShowNewFarmModal(false); setFormSuccess(''); window.location.reload(); }, 3000);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to register farmer');
+    }
+  };
+
+  // Handle Add Worker submission
+  const handleAddWorker = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    setFormSuccess('');
+    try {
+      const response = await fetch('http://localhost:5000/api/auth/register', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${localStorage.getItem('token')}` },
+        body: JSON.stringify(workerForm)
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || 'Failed to register worker');
+      setFormSuccess('Worker registered successfully!');
+      setWorkerForm({ name: '', email: '', password: '', role: 'field_officer' });
+      setTimeout(() => { setShowAddWorkerModal(false); setFormSuccess(''); }, 1500);
+    } catch (err: any) {
+      setFormError(err.message || 'Failed to register worker');
     }
   };
 
@@ -477,19 +568,19 @@ const ManagerDashboard: React.FC = () => {
             <div className="bg-white rounded-lg shadow-sm p-6">
               <h2 className="text-xl font-semibold mb-6">Quick Actions</h2>
               <div className="grid grid-cols-2 gap-3">
-                <button className="p-3 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
+                <button onClick={() => setShowAddCropModal(true)} className="p-3 bg-green-100 text-green-700 rounded-lg hover:bg-green-200 transition-colors">
                   <Package className="w-5 h-5 mx-auto mb-1" />
                   <span className="text-xs font-medium">Add Crop</span>
                 </button>
-                <button className="p-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
+                <button onClick={() => setShowNewFarmModal(true)} className="p-3 bg-blue-100 text-blue-700 rounded-lg hover:bg-blue-200 transition-colors">
                   <MapPin className="w-5 h-5 mx-auto mb-1" />
                   <span className="text-xs font-medium">New Farm</span>
                 </button>
-                <button className="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors">
+                <button onClick={() => setShowAddWorkerModal(true)} className="p-3 bg-purple-100 text-purple-700 rounded-lg hover:bg-purple-200 transition-colors">
                   <Users className="w-5 h-5 mx-auto mb-1" />
                   <span className="text-xs font-medium">Add Worker</span>
                 </button>
-                <button className="p-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors">
+                <button onClick={() => setShowReportsModal(true)} className="p-3 bg-orange-100 text-orange-700 rounded-lg hover:bg-orange-200 transition-colors">
                   <TrendingUp className="w-5 h-5 mx-auto mb-1" />
                   <span className="text-xs font-medium">Reports</span>
                 </button>
@@ -500,7 +591,7 @@ const ManagerDashboard: React.FC = () => {
       </div>
     </div>
 
-    {(ratesModalOpen && ratesData) ? (
+    {(ratesModalOpen && ratesData) && (
       <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
         <div className="bg-white rounded-lg shadow-xl w-full max-w-lg p-6">
           <h3 className="text-lg font-semibold mb-4">Farmer Work Rates</h3>
@@ -549,7 +640,49 @@ const ManagerDashboard: React.FC = () => {
           </div>
         </div>
       </div>
-    ) : null}
+    )}
+
+    <AddCropModal
+      show={showAddCropModal}
+      onClose={() => setShowAddCropModal(false)}
+      formError={formError}
+      formSuccess={formSuccess}
+      cropForm={cropForm}
+      setCropForm={setCropForm}
+      handleSubmit={handleAddCrop}
+      farmers={farmers}
+      fields={fields}
+    />
+
+    <NewFarmModal
+      show={showNewFarmModal}
+      onClose={() => setShowNewFarmModal(false)}
+      formError={formError}
+      formSuccess={formSuccess}
+      farmForm={farmForm}
+      setFarmForm={setFarmForm}
+      handleSubmit={handleNewFarm}
+    />
+
+    <AddWorkerModal
+      show={showAddWorkerModal}
+      onClose={() => setShowAddWorkerModal(false)}
+      formError={formError}
+      formSuccess={formSuccess}
+      workerForm={workerForm}
+      setWorkerForm={setWorkerForm}
+      handleSubmit={handleAddWorker}
+    />
+
+    <ReportsModal
+      show={showReportsModal}
+      onClose={() => setShowReportsModal(false)}
+      formError={formError}
+      formSuccess={formSuccess}
+      farmers={farmers}
+      recentHarvests={recentHarvests}
+      pendingPayments={pendingPayments}
+    />
     </>
   );
 };

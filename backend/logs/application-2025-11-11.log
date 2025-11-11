@@ -1,0 +1,57 @@
+{"level":"info","message":"User logged in: hat@gmail.com","timestamp":"2025-11-11 10:17:57"}
+{"level":"info","message":"Auto-generated new field_officer access code: 2E56TG9B after use by kubanjaeli@gmail.com","timestamp":"2025-11-11 10:18:41"}
+{"level":"info","message":"New user registered: kubanjaeli@gmail.com","timestamp":"2025-11-11 10:18:41"}
+{"ip":"::1","level":"error","message":"Invalid email or password","method":"POST","stack":"Error: Invalid email or password\n    at C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\src\\controllers\\authController.ts:22:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-11-11 10:56:55","url":"/api/auth/login"}
+{"level":"info","message":"New user registered: kubanjael@gmail.com","timestamp":"2025-11-11 10:57:29"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-11 11:16:33"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-11 11:16:33"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-11 11:16:33"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-11 11:16:33"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-11 11:16:33"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-11 11:16:33"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-11 11:20:23"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-11 11:20:23"}
+{"ip":"::1","level":"error","message":"User with this email already exists","method":"POST","stack":"Error: User with this email already exists\n    at C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\src\\controllers\\authController.ts:138:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-11-11 11:26:47","url":"/api/auth/register"}
+{"ip":"::1","level":"error","message":"User with this email already exists","method":"POST","stack":"Error: User with this email already exists\n    at C:\\Users\\ELDRED\\Desktop\\farmer-management-system\\backend\\src\\controllers\\authController.ts:138:13\n    at processTicksAndRejections (node:internal/process/task_queues:105:5)","timestamp":"2025-11-11 12:35:05","url":"/api/auth/register"}
+{"level":"info","message":"New user registered: kubanjal@gmail.com","timestamp":"2025-11-11 12:41:13"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-11 12:59:56"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-11 12:59:56"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-11 12:59:56"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-11 12:59:56"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-11 12:59:56"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-11 12:59:56"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-11 13:03:30"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-11 13:03:30"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-11 13:03:30"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-11 13:03:30"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-11 13:03:30"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-11 13:03:30"}
+{"level":"info","message":"New user registered: kubanjaliui@gmail.com","timestamp":"2025-11-11 13:06:41"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-11 13:07:43"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-11 13:07:43"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-11 13:07:43"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-11 13:07:43"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-11 13:07:43"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-11 13:07:43"}
+{"level":"info","message":"Server is running on port 5000","timestamp":"2025-11-11 13:12:17"}
+{"level":"info","message":"Environment: development","timestamp":"2025-11-11 13:12:17"}
+{"level":"info","message":"MongoDB connection status: Check console logs above","timestamp":"2025-11-11 13:12:17"}
+{"level":"info","message":"Connected to MongoDB","timestamp":"2025-11-11 13:12:17"}
+{"level":"info","message":"Scheduled automatic backups with cron: 0 2 * * *","timestamp":"2025-11-11 13:12:17"}
+{"level":"info","message":"Automatic backups scheduled","timestamp":"2025-11-11 13:12:17"}

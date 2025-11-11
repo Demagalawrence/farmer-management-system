@@ -10,6 +10,22 @@ const getPaymentService = () => {
     return paymentService;
 };
 class PaymentController {
+    async requestPayment(req, res) {
+        try {
+            const service = getPaymentService();
+            const body = {
+                ...req.body,
+                status: 'pending',
+                requested_by: req.user ? req.user.id : undefined,
+                requested_at: new Date(),
+            };
+            const payment = await service.create(body);
+            res.status(201).json({ success: true, data: payment });
+        }
+        catch (error) {
+            res.status(400).json({ success: false, message: error.message });
+        }
+    }
     async createPayment(req, res) {
         try {
             const service = getPaymentService();
