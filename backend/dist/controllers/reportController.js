@@ -13,7 +13,11 @@ class ReportController {
     async createReport(req, res) {
         try {
             const service = getReportService();
-            const report = await service.create(req.body);
+            const payload = { ...req.body };
+            if (!payload.generated_by && req.user?.id) {
+                payload.generated_by = req.user.id;
+            }
+            const report = await service.create(payload);
             res.status(201).json({ success: true, data: report });
         }
         catch (error) {
@@ -92,6 +96,32 @@ class ReportController {
                 return;
             }
             res.status(200).json({ success: true, message: 'Report deleted successfully' });
+        }
+        catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
+    async getPaymentChart(req, res) {
+        try {
+            const service = getReportService();
+            const { start, end, interval = 'month' } = req.query;
+            const startDate = start ? new Date(start) : new Date(new Date().getFullYear(), 0, 1);
+            const endDate = end ? new Date(end) : new Date();
+            const data = await service.aggregatePayments(startDate, endDate, String(interval));
+            res.status(200).json({ success: true, data });
+        }
+        catch (error) {
+            res.status(500).json({ success: false, message: error.message });
+        }
+    }
+    async getHarvestChart(req, res) {
+        try {
+            const service = getReportService();
+            const { start, end, interval = 'month' } = req.query;
+            const startDate = start ? new Date(start) : new Date(new Date().getFullYear(), 0, 1);
+            const endDate = end ? new Date(end) : new Date();
+            const data = await service.aggregateHarvests(startDate, endDate, String(interval));
+            res.status(200).json({ success: true, data });
         }
         catch (error) {
             res.status(500).json({ success: false, message: error.message });

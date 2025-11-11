@@ -12,6 +12,7 @@ export const schemas = {
       .pattern(/^(?=.*[a-z])(?=.*[A-Z])(?=.*\d)/)
       .message('Password must contain at least one uppercase letter, one lowercase letter, and one number'),
     role: Joi.string().valid('field_officer', 'finance', 'manager', 'farmer').required(),
+    accessCode: Joi.string().optional().allow(''),
   }),
 
   // Payment request schema (FO submits a simple request)

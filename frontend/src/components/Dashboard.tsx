@@ -2,7 +2,7 @@ import React from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import FarmerDashboard from './FarmerDashboardNew';
 import FieldOfficerDashboard from './FieldOfficerDashboardExact';
-import ManagerDashboard from './ManagerDashboardNew';
+import ManagerDashboard from './ManagerDashboardEnhanced';
 import FinancialManagerDashboard from './FinancialManagerDashboardNew';
 
 const Dashboard: React.FC = () => {

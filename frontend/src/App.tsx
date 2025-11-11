@@ -1,5 +1,6 @@
 import Dashboard from './components/Dashboard'
 import AuthPage from './components/AuthPage'
+import { ThemeProvider } from './contexts/ThemeContext'
 import { WallpaperProvider } from './contexts/WallpaperContext'
 import { AuthProvider, useAuth } from './contexts/AuthContext'
 import './App.css'
@@ -24,9 +25,11 @@ function AppContent() {
 function App() {
   return (
     <AuthProvider>
-      <WallpaperProvider>
-        <AppContent />
-      </WallpaperProvider>
+      <ThemeProvider>
+        <WallpaperProvider>
+          <AppContent />
+        </WallpaperProvider>
+      </ThemeProvider>
     </AuthProvider>
   )
 }

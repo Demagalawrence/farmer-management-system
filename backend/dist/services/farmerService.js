@@ -8,8 +8,24 @@ class FarmerService {
         this.collection = (0, db_1.getDb)().collection('farmers');
     }
     async create(farmer) {
+        let nextExternalId = farmer.external_id;
+        if (nextExternalId != null) {
+            const exists = await this.collection.findOne({ external_id: nextExternalId });
+            if (exists) {
+                throw new Error(`external_id ${nextExternalId} is already in use`);
+            }
+        }
+        else {
+            const last = await this.collection
+                .find({ external_id: { $exists: true } })
+                .sort({ external_id: -1 })
+                .limit(1)
+                .toArray();
+            nextExternalId = last.length ? (last[0].external_id || 0) + 1 : 1;
+        }
         const newFarmer = {
             ...farmer,
+            external_id: nextExternalId,
             registration_date: farmer.registration_date || new Date(),
             status: farmer.status || 'active',
             fields: farmer.fields || []
