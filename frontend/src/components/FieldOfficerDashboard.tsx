@@ -234,7 +234,7 @@ const FieldOfficerDashboard: React.FC = () => {
                 </div>
                 <div>
                   <span className="text-2xl font-bold bg-gradient-to-r from-green-600 to-emerald-600 bg-clip-text text-transparent">
-                    FARM MANAGEMENT
+                    FARMER MANAGEMENT
                   </span>
                   <div className="text-sm text-gray-500 font-medium">Field Officer Portal</div>
                 </div>

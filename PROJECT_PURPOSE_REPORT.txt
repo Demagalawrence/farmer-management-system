@@ -1,0 +1,67 @@
+Farmer Management System - Purpose Report
+
+Date: 2025-11-11
+
+1) System Purpose
+- Provide a unified platform for coordinating smallholder farming operations, improving transparency, productivity, and payments.
+- Digitize field data collection, harvest tracking, and payment workflows to reduce errors and delays.
+- Give managers real-time visibility into farm activity, financial exposure, and workforce utilization.
+
+2) Problems Addressed
+- Fragmented records (paper/WhatsApp) leading to lost data and poor traceability.
+- Slow farmer payments due to manual approvals and reconciliation.
+- Limited insight into crop progress, yields, and field conditions.
+- Difficulty planning budgets and tracking cash flow across seasons.
+
+3) Target Users and Goals
+- Field Officers
+  • Quickly record field/crop visits (planting, monitoring, harvest)
+  • Capture crop type, area, stage, health, expected yields, and notes
+  • Submit payment/budget requests to Finance
+- Farmers (as entities recorded in the system)
+  • Maintain accurate profiles and fields for payment eligibility
+- Finance Team
+  • Review/approve requests and process payments efficiently
+  • Track cash outflow and payment statuses (pending/approved/paid)
+- Managers
+  • Monitor active farms, workforce, and recent activities
+  • Assess performance and make data-driven operational decisions
+
+4) Core Capabilities
+- Farmer & Field Management
+  • Register farmers, link fields, and assign standardized codes
+  • Record crop details (crop type, variety, size, stage, health, planting date, expected yield)
+- Harvest Tracking
+  • Log harvest quantities/grades per field, per farmer
+  • Summaries for performance reporting and planning
+- Payments & Finance
+  • Create, approve, and mark payments as paid
+  • Monitor cash flow out and budget requests
+- Reporting & Oversight
+  • Generate payment/performance reports for auditability
+  • Manager dashboard: active farms, workers, activities, harvests
+
+5) Data Integrity & Security Principles
+- Authentication via JWT on all API requests
+- Role-based access (field_officer, finance, manager)
+- Input validation on all key endpoints (e.g., createField, createHarvest)
+- Consistent identifiers (farmer ObjectId or numeric external_id) to avoid orphan records
+
+6) Expected Outcomes (Success Metrics)
+- Reduce payment processing time from days to hours
+- Improve data completeness for fields and harvests (>95%)
+- Provide live figures for active farms and workforce
+- Increase transparency through searchable reports and consistent IDs
+
+7) Scope Boundaries
+- In scope: field data capture, harvest logs, payments, basic reports, dashboards
+- Out of scope (current phase): inventory management, advanced forecasting/ML, complex logistics/warehousing
+
+8) Future Roadmap (High-Level)
+- Officer attribution on fields and per-officer summaries
+- REST summaries for dashboards (e.g., /fields/summary)
+- Enhanced farmer onboarding (KYC, mobile contact integration)
+- Notifications/alerts (threshold breaches, overdue visits)
+- Offline-first capture for areas with poor connectivity
+
+This document describes the why of the system—its purpose, the problems it solves, and the value delivered to each stakeholder. For technical details (stack, endpoints, and recent changes), see PROJECT_REPORT.txt.

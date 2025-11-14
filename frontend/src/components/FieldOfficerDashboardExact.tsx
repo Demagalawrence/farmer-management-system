@@ -33,6 +33,35 @@ const FieldOfficerDashboard: React.FC = () => {
       .animate-glow { animation: glow 2s ease-in-out infinite; }
       .animate-slideInUp { animation: slideInUp 0.6s ease-out; }
       .shadow-3xl { box-shadow: 0 35px 60px -12px rgba(0, 0, 0, 0.25); }
+
+      /* Theme palette inspired by provided image */
+      :root {
+        --emerald-500: #10b981;
+        --emerald-600: #059669;
+        --teal-500: #14b8a6;
+        --sky-500: #0ea5e9;
+        --glass-bg: rgba(255, 255, 255, 0.12);
+        --glass-strong: rgba(255, 255, 255, 0.18);
+        --glass-border: rgba(255, 255, 255, 0.25);
+        --card-shadow: 0 10px 30px rgba(0, 0, 0, 0.25);
+      }
+      .glass-card {
+        background: var(--glass-bg);
+        backdrop-filter: blur(12px);
+        -webkit-backdrop-filter: blur(12px);
+        border: 1px solid var(--glass-border);
+        box-shadow: var(--card-shadow);
+      }
+      .glass-card-strong {
+        background: var(--glass-strong);
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        border-bottom: 1px solid var(--glass-border);
+      }
+      .accent-pill {
+        background: linear-gradient(135deg, var(--emerald-500), var(--teal-500));
+        color: white;
+      }
     `;
     document.head.appendChild(style);
     return () => {
@@ -61,9 +90,15 @@ const FieldOfficerDashboard: React.FC = () => {
       await fieldService.createField({
         farmer_id: fieldForm.farmer_id as unknown as any,
         location: fieldForm.location,
+        crop_name: fieldForm.crop_name as unknown as any,
         size_hectares: size,
         crop_stage: fieldForm.crop_stage,
         health_status: fieldForm.health_status,
+        visit_type: fieldForm.visit_type as any,
+        variety: fieldForm.variety as any,
+        planting_date: fieldForm.planting_date ? new Date(fieldForm.planting_date) as any : undefined,
+        expected_yield_kg: fieldForm.expected_yield_kg ? parseFloat(fieldForm.expected_yield_kg as any) : undefined,
+        notes: fieldForm.notes as any,
       } as any);
       // Refresh fields and derived counts
       const flds = await fieldService.getAllFields();
@@ -75,7 +110,7 @@ const FieldOfficerDashboard: React.FC = () => {
       setNeedsAttentionFields(needs);
       setActionMessage('✅ Field data recorded');
       setShowFieldModal(false);
-      setFieldForm({ farmer_id: '', location: '', size_hectares: '', crop_stage: 'planting', health_status: 'healthy' });
+      setFieldForm({ farmer_id: '', location: '', crop_name: '', size_hectares: '', crop_stage: 'planting', health_status: 'healthy', visit_type: 'planting', variety: '', planting_date: '', expected_yield_kg: '', notes: '' });
     } catch (err) {
       setActionError('Failed to record field data');
     }
@@ -109,8 +144,7 @@ const FieldOfficerDashboard: React.FC = () => {
       const createdRes = await harvestService.createHarvest({
         field_id: harvestForm.field_id as unknown as any,
         farmer_id: harvestForm.farmer_id as unknown as any,
-        crop_name: harvestForm.crop_name as unknown as any,
-        crop: harvestForm.crop_name as unknown as any,
+        crop_type: harvestForm.crop_name as unknown as any,
         quantity_tons: qty,
         quality_grade: harvestForm.quality_grade,
       } as any);
@@ -216,9 +250,15 @@ const FieldOfficerDashboard: React.FC = () => {
       await fieldService.createField({
         farmer_id: fieldForm.farmer_id as unknown as any,
         location: fieldForm.location,
+        crop_name: fieldForm.crop_name as unknown as any,
         size_hectares: parseFloat(fieldForm.size_hectares),
         crop_stage: fieldForm.crop_stage,
         health_status: fieldForm.health_status,
+        visit_type: fieldForm.visit_type as any,
+        variety: fieldForm.variety as any,
+        planting_date: fieldForm.planting_date ? new Date(fieldForm.planting_date) as any : undefined,
+        expected_yield_kg: fieldForm.expected_yield_kg ? parseFloat(fieldForm.expected_yield_kg as any) : undefined,
+        notes: fieldForm.notes as any,
       } as any);
       // Refresh fields and derived counts
       const flds = await fieldService.getAllFields();
@@ -230,55 +270,15 @@ const FieldOfficerDashboard: React.FC = () => {
       setNeedsAttentionFields(needs);
       setActionMessage('✅ Field data recorded');
       setShowFieldModal(false);
-      setFieldForm({ farmer_id: '', location: '', size_hectares: '', crop_stage: 'planting', health_status: 'healthy' });
+      setFieldForm({ farmer_id: '', location: '', crop_name: '', size_hectares: '', crop_stage: 'planting', health_status: 'healthy', visit_type: 'planting', variety: '', planting_date: '', expected_yield_kg: '', notes: '' });
     } catch (err) {
       setActionError('Failed to record field data');
     }
   };
 
   // Generate Report and send to Manager
-  const handleCreateReport = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setActionError('');
-    setActionMessage('');
-    try {
-      await reportService.createReport({
-        type: reportForm.type,
-        generated_by: (user as any)?.id || (user as any)?._id,
-        date_range_start: new Date(reportForm.date_range_start),
-        date_range_end: new Date(reportForm.date_range_end),
-        data: { notes: reportForm.notes, sent_to: 'manager' },
-      } as any);
-      setActionMessage('✅ Report generated and sent to Manager');
-      setShowReportModal(false);
-      setReportForm({ type: 'performance', date_range_start: '', date_range_end: '', notes: '' });
-    } catch (err) {
-      setActionError('Failed to generate report');
-    }
-  };
+  
 
-  // Request payment for inputs
-  const handleRequestPayment = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setActionError('');
-    setActionMessage('');
-    try {
-      const fid: any = /^\d+$/.test(paymentForm.farmer_id)
-        ? parseInt(paymentForm.farmer_id, 10)
-        : paymentForm.farmer_id;
-      await paymentService.requestPayment({
-        farmer_id: fid,
-        amount: parseFloat(paymentForm.amount),
-        purpose: paymentForm.purpose,
-      });
-      setActionMessage('✅ Payment request submitted');
-      setShowPaymentModal(false);
-      setPaymentForm({ farmer_id: '', amount: '', purpose: '' });
-    } catch (err: any) {
-      const msg = err?.response?.data?.message || err?.message || 'Failed to request payment';
-      setActionError(msg);
-    }
-  };
   const { currentWallpaper, setWallpaper } = useWallpaper();
   const { logout, user } = useAuth();
   const [showWallpaperGallery, setShowWallpaperGallery] = useState(false);
@@ -323,14 +323,26 @@ const FieldOfficerDashboard: React.FC = () => {
 
   
   const [isSidebarExpanded, setIsSidebarExpanded] = useState(true);
+  // Notifications state
+  const [showNotifications, setShowNotifications] = useState(false);
+  const [notifications, setNotifications] = useState<Array<{ id: string; type: 'payment' | 'budget'; title: string; desc?: string; date?: string }>>([]);
+  const [selectedNotification, setSelectedNotification] = useState<{ id: string; type: 'payment' | 'budget'; title: string; desc?: string; date?: string } | null>(null);
+  const [unreadCount, setUnreadCount] = useState<number>(0);
+  const lastSeenRef = React.useRef<number>(Date.now());
 
   // Forms
   const [fieldForm, setFieldForm] = useState({
     farmer_id: '',
     location: '',
+    crop_name: '',
     size_hectares: '',
     crop_stage: 'planting' as 'planting' | 'growing' | 'mature' | 'harvest_ready',
-    health_status: 'healthy' as 'healthy' | 'needs_attention' | 'critical'
+    health_status: 'healthy' as 'healthy' | 'needs_attention' | 'critical',
+    visit_type: 'planting' as 'planting' | 'monitoring' | 'harvest',
+    variety: '',
+    planting_date: '',
+    expected_yield_kg: '',
+    notes: ''
   });
   const [harvestForm, setHarvestForm] = useState({
     field_id: '',
@@ -375,6 +387,43 @@ const FieldOfficerDashboard: React.FC = () => {
     });
     return months.map(m => ({ month: m, tons: sums[m] }));
   }, [harvests]);
+
+  // Fetch manager messages (reports) targeted to Field Officers and populate notifications
+  const fetchFoNotifications = React.useCallback(async () => {
+    try {
+      const res: any = await reportService.getAllReports?.();
+      const list = Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []);
+      const items = (list || [])
+        .filter((r: any) => r?.data?.sent_to === 'field_officer' && r?.data?.category === 'manager_to_field')
+        .map((r: any) => ({
+          id: String(r._id || r.id || Math.random()),
+          type: 'budget' as const,
+          title: r?.data?.title || 'Manager Message',
+          desc: r?.data?.message || '',
+          date: r?.created_at || r?.createdAt || r?.date_range_end || new Date().toISOString(),
+        }))
+        .sort((a: any, b: any) => new Date(b.date || 0).getTime() - new Date(a.date || 0).getTime())
+        .slice(0, 20);
+      setNotifications(items);
+      const latestTime = items.length ? new Date(items[0].date || 0).getTime() : 0;
+      if (latestTime && latestTime > lastSeenRef.current) {
+        const newCount = items.filter((i: { date?: string }) => new Date(i.date || 0).getTime() > lastSeenRef.current).length;
+        setUnreadCount(newCount);
+      }
+    } catch (e) {
+      // ignore fetch errors for now
+    }
+  }, []);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => { if (mounted) await fetchFoNotifications(); };
+    load();
+    const t = setInterval(load, 15000);
+    const onVis = () => { if (document.visibilityState === 'visible') fetchFoNotifications(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { mounted = false; clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, [fetchFoNotifications]);
 
   // Robust harvest readiness count (supports various stage spellings)
   const readyFieldsCount = React.useMemo(() => {
@@ -460,6 +509,65 @@ const FieldOfficerDashboard: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
+  // Build notifications list (reusable)
+  const fetchNotifications = React.useCallback(async () => {
+    const items: Array<{ id: string; type: 'payment' | 'budget'; title: string; desc?: string; date?: string }> = [];
+    // Payments marked as paid (use status endpoint for efficiency)
+    try {
+      const payRes: any = await paymentService.getPaymentsByStatus?.('paid' as any);
+      const pays = Array.isArray(payRes) ? payRes : (payRes?.data || payRes?.items || []);
+      (pays || []).slice(0, 12).forEach((p: any) => {
+        const pid = String(p._id || p.id || Math.random());
+        const amt = Number(p.amount || 0);
+        const fid = String(p.farmer_id || '');
+        items.push({
+          id: `pay_${pid}`,
+          type: 'payment',
+          title: `Farmer ${fid} has been paid`,
+          desc: amt ? `Amount: ${amt.toLocaleString()}` : undefined,
+          date: p.payment_date || p.updated_at || p.created_at,
+        });
+      });
+    } catch {}
+
+    // Budget outputs from finance
+    try {
+      const byType: any = await reportService.getReportsByType('payment_report');
+      const list = Array.isArray(byType) ? byType : (byType?.data || byType?.items || []);
+      const budgetOut = (list || []).filter((r: any) => {
+        const cat = String(r?.data?.category || '').toLowerCase();
+        const to = String(r?.data?.sent_to || '').toLowerCase();
+        return (cat === 'budget_output' || cat === 'budget_planned' || cat === 'budget_approved') || to === 'field_officer';
+      });
+      budgetOut.slice(0, 12).forEach((r: any) => {
+        const rid = String(r._id || r.id || Math.random());
+        const tot = Number(r?.data?.total_amount || r?.data?.approved_total || 0);
+        items.push({
+          id: `bud_${rid}`,
+          type: 'budget',
+          title: 'Budget output from Finance',
+          desc: tot ? `Total: ${tot.toLocaleString()}` : (r?.data?.notes || undefined),
+          date: r.created_at,
+        });
+      });
+    } catch {}
+
+    setNotifications(items.sort((a,b)=> new Date(b.date||0).getTime() - new Date(a.date||0).getTime()).slice(0, 10));
+    // Only set unread if dropdown is closed
+    setUnreadCount((prev) => (showNotifications ? prev : items.length));
+  }, [showNotifications]);
+
+  // Initial load + polling + focus refresh
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => { if (!mounted) return; await fetchNotifications(); };
+    load();
+    const t = setInterval(load, 15000);
+    const onVis = () => { if (document.visibilityState === 'visible') fetchNotifications(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { mounted = false; clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, [fetchNotifications]);
+
   // Refresh counts after a successful farmer registration
   React.useEffect(() => {
     if (!registerSuccess) return;
@@ -508,63 +616,45 @@ const FieldOfficerDashboard: React.FC = () => {
   // My Crops derived from data (harvests + fields)
   const myCropsData = React.useMemo(() => {
     const norm = (s: any) => String(s || '').trim();
-    const cap = (s: string) => s ? (s.charAt(0).toUpperCase() + s.slice(1).toLowerCase()) : s;
-    const stageNorm = (v: string) => String(v || '').toLowerCase().replace(/\s+/g, '_');
-    const stageToProgress: Record<string, number> = {
-      planted: 25,
-      planting: 25,
-      sprouting: 65,
-      growing: 70,
-      mature: 90,
-      harvest_ready: 100,
-      harvest: 100,
-      ripe: 100,
-    };
-    const stageToLabel: Record<string, string> = {
-      planted: 'Planted',
-      planting: 'Planted',
-      sprouting: 'Sprouting',
-      growing: 'Growing',
-      mature: 'Excellent',
-      harvest_ready: 'Harvest',
-      harvest: 'Harvest',
-      ripe: 'Harvest',
-    };
-    const colorFor = (p: number) => p >= 90 ? '#90EE90' : p >= 70 ? '#FFD700' : p >= 40 ? '#FFA500' : '#DEB887';
+    const cap = (s: string) => (s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : s);
+    const colorFor = (p: number) => (p >= 90 ? '#90EE90' : p >= 70 ? '#FFD700' : p >= 40 ? '#FFA500' : '#DEB887');
 
-    // Map field_id -> stage
-    const fieldStage: Record<string, string> = {};
-    (fields || []).forEach((f: any) => {
-      const id = String(f._id || f.id || '');
-      const st = stageNorm(f.crop_stage || f.stage || f.harvest_stage || '');
-      if (id) fieldStage[id] = st;
-    });
-
-    // Aggregate by crop name taking latest progress per crop
-    const agg: Record<string, { name: string; progress: number; status: string; color: string } > = {};
+    // Aggregate total tons by crop name
+    const tonsByCrop: Record<string, number> = {};
     (harvests || []).forEach((h: any) => {
-      const cname = cap(norm(h.crop_name || h.cropName || h.crop));
+      const cname = cap(norm(h.crop_name || h.cropName || h.crop || h.crop_type));
       if (!cname) return;
-      const fid = String(h.field_id || h.fieldId || '');
-      const stKey = fieldStage[fid] || '';
-      let progress = stKey ? (stageToProgress[stKey] ?? 40) : 40;
-      // If explicitly harvest record exists, prefer 100
-      if (stKey === 'harvest' || stKey === 'harvest_ready') progress = 100;
-      const status = stKey ? (stageToLabel[stKey] || (progress >= 90 ? 'Excellent' : progress >= 70 ? 'Good' : progress >= 40 ? 'Fair' : 'Needs Attention'))
-                           : (progress >= 90 ? 'Excellent' : progress >= 70 ? 'Good' : progress >= 40 ? 'Fair' : 'Needs Attention');
-      const color = colorFor(progress);
-      if (!(cname in agg) || agg[cname].progress < progress) {
-        agg[cname] = { name: cname, progress, status, color };
-      }
+      const qty = Number(h.quantity_tons || h.quantity || h.tons || 0);
+      if (!Number.isFinite(qty)) return;
+      tonsByCrop[cname] = (tonsByCrop[cname] || 0) + qty;
     });
 
-    // Return array; if empty, show a helpful placeholder
-    const arr = Object.values(agg);
-    if (!arr.length) {
+    // Also include crop names from fields even if tons are not recorded yet
+    (fields || []).forEach((f: any) => {
+      const cname = cap(norm(f.crop_name || f.cropName || f.crop || f.crop_type));
+      if (!cname) return;
+      if (!(cname in tonsByCrop)) tonsByCrop[cname] = 0;
+    });
+
+    const entries = Object.entries(tonsByCrop).map(([name, tons]) => ({ name, tons }));
+
+    if (!entries.length) {
       return [
         { name: 'No crops yet', progress: 0, color: '#e5e7eb', status: 'Record Crop Data to see crops here' }
       ];
     }
+
+    const maxTons = Math.max(...entries.map(e => e.tons));
+    const arr = entries.map(e => {
+      const percent = maxTons > 0 ? Math.round((e.tons / maxTons) * 100) : 0;
+      return {
+        name: e.name,
+        progress: percent,
+        status: `${e.tons} tons`,
+        color: colorFor(percent),
+      };
+    });
+
     return arr.sort((a, b) => b.progress - a.progress).slice(0, 8);
   }, [harvests, fields]);
 
@@ -655,12 +745,12 @@ const FieldOfficerDashboard: React.FC = () => {
   return (
     <div className={`min-h-screen ${currentWallpaper.background} relative overflow-hidden`}>
       {/* Premium Background Effects */}
-      <div className="absolute inset-0 bg-gradient-to-br from-blue-50/30 via-transparent to-green-50/30 pointer-events-none"></div>
+      <div className="absolute inset-0 bg-gradient-to-br from-emerald-600/30 via-teal-500/20 to-sky-500/25 pointer-events-none"></div>
       <div className="absolute top-0 left-0 w-full h-full opacity-20 pointer-events-none" style={{
         backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%239C92AC' fill-opacity='0.4'%3E%3Ccircle cx='30' cy='30' r='2'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`
       }}></div>
       {/* Premium Header */}
-      <div className="bg-white/95 backdrop-blur-md shadow-xl border-b border-gray-200/50 relative z-10">
+      <div className="glass-card-strong shadow-xl relative z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
             {/* Left side - Logo and title */}
@@ -672,7 +762,7 @@ const FieldOfficerDashboard: React.FC = () => {
 
       {/* Removed hover zone */}
 
-                <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
+                <span className="text-xl font-bold text-gray-900">FARMER MANAGEMENT</span>
                 <span className="text-sm text-gray-500">System</span>
               </div>
             </div>
@@ -696,10 +786,76 @@ const FieldOfficerDashboard: React.FC = () => {
               </button>
               
               {/* Notifications */}
-              <button className="p-2 bg-gray-100 rounded-lg relative">
-                <span className="text-lg">🔔</span>
-                <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={async () => { await fetchNotifications(); setShowNotifications((s) => !s); setUnreadCount(0); }}
+                  className="p-2 bg-gray-100 rounded-lg relative"
+                  title="Notifications"
+                >
+                  <span className="text-lg">🔔</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-80 max-h-96 overflow-auto glass-card rounded-xl p-3 z-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-semibold">Notifications</div>
+                      <button onClick={()=>setShowNotifications(false)} className="text-xs text-gray-600 hover:underline">Close</button>
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="text-xs text-gray-600 p-3 bg-gray-50 rounded-lg">No notifications</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {notifications.map((n)=> (
+                          <button key={n.id} onClick={()=> setSelectedNotification(n)} className="w-full text-left p-2 bg-white/80 rounded-lg border border-white/40 hover:bg-white">
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              <span className={n.type==='payment' ? 'text-emerald-600' : 'text-amber-600'}>
+                                {n.type==='payment' ? '💸' : '📑'}
+                              </span>
+                              {n.title}
+                            </div>
+                            {n.desc && <div className="text-xs text-gray-600 mt-0.5">{n.desc}</div>}
+                            {n.date && <div className="text-[10px] text-gray-500 mt-0.5">{new Date(n.date).toLocaleString()}</div>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+              {selectedNotification && (
+                <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+                  <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" id="printable-notif-fo">
+                    <div className="flex items-center justify-between mb-3">
+                      <h3 className="text-lg font-semibold">Notification Details</h3>
+                      <button onClick={()=> setSelectedNotification(null)} className="px-3 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm">Close</button>
+                    </div>
+                    <div className="space-y-2 text-sm">
+                      <div className="text-xs uppercase tracking-wide text-gray-500">{selectedNotification.type === 'payment' ? 'Payment' : 'Budget'}</div>
+                      <div className="font-medium">{selectedNotification.title}</div>
+                      {selectedNotification.desc && <div className="text-gray-700">{selectedNotification.desc}</div>}
+                      {selectedNotification.date && <div className="text-xs text-gray-500">{new Date(selectedNotification.date).toLocaleString()}</div>}
+                    </div>
+                    <div className="mt-4 flex justify-end gap-2">
+                      <button
+                        onClick={() => {
+                          const node = document.getElementById('printable-notif-fo');
+                          if (!node) return window.print();
+                          const w = window.open('', '_blank', 'width=800,height=600');
+                          if (!w) return;
+                          w.document.write(`<html><head><title>Notification</title></head><body>${node.innerHTML}</body></html>`);
+                          w.document.close();
+                          w.focus();
+                          w.print();
+                          w.close();
+                        }}
+                        className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+                      >Print</button>
+                    </div>
+                  </div>
+                </div>
+              )}
               
               {/* User profile */}
               <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
@@ -722,7 +878,7 @@ const FieldOfficerDashboard: React.FC = () => {
         <div className="flex gap-6">
           {/* Premium Sidebar */}
           <div
-            className={`w-80 overflow-hidden bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6 relative z-10 transition-all duration-300`}
+            className={`w-80 overflow-hidden glass-card rounded-2xl p-6 relative z-10 transition-all duration-300`}
           >
             <nav className="space-y-[45px]">
               <div className="flex items-center space-x-3 bg-green-100 text-green-700 px-3 py-2 rounded-lg">
@@ -734,7 +890,7 @@ const FieldOfficerDashboard: React.FC = () => {
                 className="w-full flex items-center space-x-3 text-gray-600 px-5 py-4 rounded-xl hover:bg-gray-50 transition-colors text-base font-semibold"
               >
                 <MapPin className="w-4 h-4" />
-                {isSidebarExpanded && <span>Add Location</span>}
+                {isSidebarExpanded && <span>Assign Farmer</span>}
               </button>
               <button 
                 onClick={() => setShowRegisterModal(true)}
@@ -757,13 +913,6 @@ const FieldOfficerDashboard: React.FC = () => {
               >
                 <span className="text-sm">🌾</span>
                 <span className="font-medium">Record Crop Data</span>
-              </button>
-              <button 
-                onClick={() => setShowReportModal(true)}
-                className="w-full mt-2 flex items-center space-x-3 bg-indigo-500 hover:bg-indigo-600 text-white px-5 py-4 rounded-xl transition-colors shadow-lg text-base font-semibold"
-              >
-                <span className="text-sm">📄</span>
-                <span className="font-medium">Generate Report</span>
               </button>
               <button 
                 onClick={() => setShowPaymentModal(true)}
@@ -854,8 +1003,8 @@ const FieldOfficerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Recent Activities and Pending Tasks */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Recent Activities */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Recent Activities */}
               <div className="lg:col-span-2 bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
                 <h2 className="text-xl font-semibold mb-4">Recent Activities</h2>
@@ -910,33 +1059,13 @@ const FieldOfficerDashboard: React.FC = () => {
                   </div>
                 </div>
               </div>
-
-              {/* Pending Tasks */}
-              <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
-                <h2 className="text-xl font-semibold mb-4">Pending Tasks</h2>
-                <div className="space-y-3 text-sm">
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span>Pending verifications</span>
-                    <span className="font-semibold">{pendingVerifications}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                    <span>Visits suggested</span>
-                    <span className="font-semibold">{needsAttentionFields}</span>
-                  </div>
-                </div>
-              </div>
             </div>
 
             {/* Quick Reports */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
               <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
                 <p className="text-sm text-gray-500">Crop Health</p>
                 <p className="mt-1 text-2xl font-semibold text-gray-900">Healthy: {fields.filter((x:any)=>x.health_status==='healthy').length}</p>
-                <button onClick={()=>setShowReportModal(true)} className="mt-3 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Generate</button>
-              </div>
-              <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
-                <p className="text-sm text-gray-500">Harvest Readiness</p>
-                <p className="mt-1 text-2xl font-semibold text-gray-900">Ready: {readyFieldsCount}</p>
                 <button onClick={()=>setShowReportModal(true)} className="mt-3 px-3 py-2 bg-indigo-600 text-white rounded-md text-sm">Generate</button>
               </div>
               <div className="bg-white/90 backdrop-blur-md rounded-2xl shadow-2xl border border-white/20 p-6">
@@ -949,7 +1078,7 @@ const FieldOfficerDashboard: React.FC = () => {
             {/* Bottom Row - Crop Growth Monitoring and My Crops - EXACT Layout */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
               {/* Crop Growth Monitoring - EXACT from your image */}
-              <div className="lg:col-span-2 bg-white rounded-lg shadow-sm p-6">
+              <div className="lg:col-span-2 glass-card rounded-xl p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-xl font-semibold">Crop Growth Monitoring</h2>
                   <div className="flex space-x-2">
@@ -1005,7 +1134,7 @@ const FieldOfficerDashboard: React.FC = () => {
               </div>
 
               {/* My Crops - EXACT from your image */}
-              <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="glass-card rounded-xl p-6">
                 <div className="flex justify-between items-center mb-4">
                   <h2 className="text-lg font-semibold">My Crops</h2>
                   <button 
@@ -1189,9 +1318,20 @@ const FieldOfficerDashboard: React.FC = () => {
               <button onClick={() => setShowFieldModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-6 h-6"/></button>
             </div>
             <form onSubmit={submitFieldData} className="space-y-4">
+              <div className="flex gap-2">
+                <button type="button" onClick={()=>setFieldForm({...fieldForm, visit_type: 'planting'})} className={`flex-1 px-4 py-2 rounded-lg border ${fieldForm.visit_type==='planting'?'bg-green-100 border-green-400':'bg-white'}`}>Planting</button>
+                <button type="button" onClick={()=>setFieldForm({...fieldForm, visit_type: 'monitoring'})} className={`flex-1 px-4 py-2 rounded-lg border ${fieldForm.visit_type==='monitoring'?'bg-green-100 border-green-400':'bg-white'}`}>Monitoring</button>
+                <button type="button" onClick={()=>setFieldForm({...fieldForm, visit_type: 'harvest'})} className={`flex-1 px-4 py-2 rounded-lg border ${fieldForm.visit_type==='harvest'?'bg-green-100 border-green-400':'bg-white'}`}>Harvest</button>
+              </div>
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Farmer ID" value={fieldForm.farmer_id} onChange={(e)=>setFieldForm({...fieldForm, farmer_id: e.target.value})} required />
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Location" value={fieldForm.location} onChange={(e)=>setFieldForm({...fieldForm, location: e.target.value})} required />
+              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Crop Name (e.g., Maize)" value={fieldForm.crop_name} onChange={(e)=>setFieldForm({...fieldForm, crop_name: e.target.value})} />
               <input className="w-full px-4 py-2 border rounded-lg" placeholder="Size (hectares)" value={fieldForm.size_hectares} onChange={(e)=>setFieldForm({...fieldForm, size_hectares: e.target.value})} required />
+              <input className="w-full px-4 py-2 border rounded-lg" placeholder="Variety/Cultivar (e.g., Hybrid DK-777)" value={fieldForm.variety} onChange={(e)=>setFieldForm({...fieldForm, variety: e.target.value})} />
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <input type="date" className="w-full px-4 py-2 border rounded-lg" placeholder="Planting Date" value={fieldForm.planting_date} onChange={(e)=>setFieldForm({...fieldForm, planting_date: e.target.value})} />
+                <input className="w-full px-4 py-2 border rounded-lg" placeholder="Expected Yield (kg)" value={fieldForm.expected_yield_kg} onChange={(e)=>setFieldForm({...fieldForm, expected_yield_kg: e.target.value})} />
+              </div>
               <select className="w-full px-4 py-2 border rounded-lg" value={fieldForm.crop_stage} onChange={(e)=>setFieldForm({...fieldForm, crop_stage: e.target.value as any})}>
                 <option value="planting">Planting</option>
                 <option value="growing">Growing</option>
@@ -1203,6 +1343,7 @@ const FieldOfficerDashboard: React.FC = () => {
                 <option value="needs_attention">Needs Attention</option>
                 <option value="critical">Critical</option>
               </select>
+              <textarea className="w-full px-4 py-2 border rounded-lg" placeholder="Notes & Observations" value={fieldForm.notes} onChange={(e)=>setFieldForm({...fieldForm, notes: e.target.value})} />
               {actionError && <p className="text-sm text-red-600">{actionError}</p>}
               {actionMessage && <p className="text-sm text-green-600">{actionMessage}</p>}
               <div className="flex space-x-3 pt-2">

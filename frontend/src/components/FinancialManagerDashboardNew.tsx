@@ -4,6 +4,7 @@ import { DollarSign, TrendingUp, TrendingDown, CreditCard, AlertTriangle, PieCha
 import { useAuth } from '../contexts/AuthContext';
 import { paymentService } from '../services/paymentService';
 import { farmerService } from '../services/farmerService';
+import { harvestService } from '../services/harvestService';
 import { formatUGX } from '../utils/currency';
 import { reportService } from '../services/reportService';
 
@@ -15,6 +16,7 @@ const FinancialManagerDashboard: React.FC = () => {
   const [apError, setApError] = React.useState('');
   const approvedRef = React.useRef<HTMLDivElement | null>(null);
   const [farmers, setFarmers] = React.useState<any[]>([]);
+  const [harvests, setHarvests] = React.useState<any[]>([]);
   const [processing, setProcessing] = React.useState(false);
   const [showProcessModal, setShowProcessModal] = React.useState(false);
   const [selectedPayment, setSelectedPayment] = React.useState<any | null>(null);
@@ -32,6 +34,7 @@ const FinancialManagerDashboard: React.FC = () => {
     requested: Record<string, number>;
     approved: Record<string, number>;
   } | null>(null);
+  const [openSendMenuId, setOpenSendMenuId] = React.useState<string | null>(null);
   const [showReportModal, setShowReportModal] = React.useState(false);
   const [showInvoiceModal, setShowInvoiceModal] = React.useState(false);
   const [reportForm, setReportForm] = React.useState({
@@ -47,6 +50,11 @@ const FinancialManagerDashboard: React.FC = () => {
   });
   const [actionError, setActionError] = React.useState('');
   const [actionMessage, setActionMessage] = React.useState('');
+  // Notifications (from Field Officers and Manager)
+  const [showNotifications, setShowNotifications] = React.useState(false);
+  const [notifications, setNotifications] = React.useState<Array<{ id: string; from: 'field_officer' | 'manager'; type: 'payment' | 'budget' | 'report'; title: string; desc?: string; date?: string }>>([]);
+  const [selectedNotification, setSelectedNotification] = React.useState<{ id: string; from: 'field_officer' | 'manager'; type: 'payment' | 'budget' | 'report'; title: string; desc?: string; date?: string } | null>(null);
+  const [unreadCount, setUnreadCount] = React.useState(0);
 
   // Helpers and derived finance statistics
   const currency = (n: number) => formatUGX(n);
@@ -59,6 +67,11 @@ const FinancialManagerDashboard: React.FC = () => {
   const approvedCount = React.useMemo(() => approvedPayments.length, [approvedPayments]);
   const paidCount = React.useMemo(() => allPayments.filter((p) => p.status === 'paid').length, [allPayments]);
   const farmersCount = React.useMemo(() => farmers.length, [farmers]);
+  const totalCashOut = React.useMemo(() =>
+    (allPayments || [])
+      .filter((p) => p.status === 'paid')
+      .reduce((sum, p) => sum + Number(p.amount || 0), 0)
+  , [allPayments]);
 
   const renderStatusBadge = (s: string) => {
     const base = 'inline-flex items-center px-2 py-0.5 rounded text-xs font-medium';
@@ -74,15 +87,18 @@ const FinancialManagerDashboard: React.FC = () => {
       try {
         setApLoading(true);
         setApError('');
-        const [allPays, farmersRes] = await Promise.all([
+        const [allPays, farmersRes, harvestRes] = await Promise.all([
           paymentService.getAllPayments(),
-          farmerService.getAllFarmers()
+          farmerService.getAllFarmers(),
+          harvestService.getAllHarvests()
         ]);
         if (!mounted) return;
         const all = Array.isArray(allPays?.data) ? allPays.data : (Array.isArray(allPays) ? allPays : []);
         setAllPayments(all);
         setApprovedPayments(all.filter((p: any) => p.status === 'approved'));
         setFarmers(farmersRes?.data || []);
+        const hv = Array.isArray(harvestRes?.data) ? harvestRes.data : (Array.isArray(harvestRes) ? harvestRes : []);
+        setHarvests(hv);
       } catch (e) {
         if (!mounted) return;
         setApError('Failed to load approved payments');
@@ -94,11 +110,120 @@ const FinancialManagerDashboard: React.FC = () => {
     return () => { mounted = false; };
   }, []);
 
+  // Build notifications list for Finance
+  const fetchNotifications = React.useCallback(async () => {
+    const items: Array<{ id: string; from: 'field_officer' | 'manager'; type: 'payment' | 'budget' | 'report'; title: string; desc?: string; date?: string }> = [];
+    // From Field Officers: new payment requests (pending)
+    try {
+      const pendRes: any = await paymentService.getPaymentsByStatus?.('pending' as any);
+      const pend = Array.isArray(pendRes) ? pendRes : (pendRes?.data || pendRes?.items || []);
+      (pend || []).slice(0, 12).forEach((p: any) => {
+        const pid = String(p._id || p.id || Math.random());
+        const amt = Number(p.amount || 0);
+        const fid = String(p.farmer_id || '');
+        items.push({
+          id: `req_${pid}`,
+          from: 'field_officer',
+          type: 'payment',
+          title: `Payment request from Field Officer · Farmer ${fid}`,
+          desc: amt ? `Amount requested: ${formatUGX(amt)}` : undefined,
+          date: p.created_at,
+        });
+      });
+    } catch {}
+    // From Field Officers: budget requests to finance
+    try {
+      const byType: any = await reportService.getReportsByType('payment_report');
+      const list = Array.isArray(byType) ? byType : (byType?.data || byType?.items || []);
+      const budgetReqs = (list || []).filter((r: any) => String(r.type) === 'payment_report' && (r.data?.category === 'budget_request' || String(r.data?.sent_to || '').toLowerCase() === 'finance'));
+      budgetReqs.slice(0, 12).forEach((r: any) => {
+        const rid = String(r._id || r.id || Math.random());
+        const tot = Number(r?.data?.total_amount || 0);
+        items.push({
+          id: `bud_${rid}`,
+          from: 'field_officer',
+          type: 'budget',
+          title: 'Budget request received',
+          desc: tot ? `Total requested: ${formatUGX(tot)}` : (r?.data?.notes || undefined),
+          date: r.created_at,
+        });
+      });
+    } catch {}
+    // From Manager: processed payments reports
+    try {
+      const byType: any = await reportService.getReportsByType('payment_report');
+      const list = Array.isArray(byType) ? byType : (byType?.data || byType?.items || []);
+      const mgr = (list || []).filter((r: any) => String(r.type) === 'payment_report' && String(r.data?.category) === 'payment_processed');
+      mgr.slice(0, 12).forEach((r: any) => {
+        const rid = String(r._id || r.id || Math.random());
+        const amt = Number(r?.data?.amount || 0);
+        const fid = String(r?.data?.farmer_id || '');
+        items.push({
+          id: `mgr_${rid}`,
+          from: 'manager',
+          type: 'report',
+          title: `Manager processed payment · Farmer ${fid}`,
+          desc: amt ? `Amount: ${formatUGX(amt)}` : undefined,
+          date: r.created_at,
+        });
+      });
+      // Manager decision notifications (approved / rejected)
+      const decisions = (list || []).filter((r: any) => String(r.type) === 'payment_report' && String(r?.data?.category) === 'manager_decision' && String(r?.data?.sent_to).toLowerCase() === 'finance');
+      decisions.slice(0, 12).forEach((r: any) => {
+        const rid = String(r._id || r.id || Math.random());
+        const decision = String(r?.data?.decision || '').toLowerCase();
+        items.push({
+          id: `mgr_dec_${rid}`,
+          from: 'manager',
+          type: 'report',
+          title: `Manager decision: ${decision === 'approved' ? 'Approved' : 'Rejected'}`,
+          desc: r?.data?.notes || undefined,
+          date: r.created_at,
+        });
+      });
+    } catch {}
+
+    setNotifications(items.sort((a,b)=> new Date(b.date||0).getTime() - new Date(a.date||0).getTime()).slice(0, 12));
+    setUnreadCount((prev)=> (showNotifications ? prev : items.length));
+  }, [showNotifications]);
+
+  // Polling and focus refresh
+  React.useEffect(() => {
+    let mounted = true;
+    const load = async () => { if (!mounted) return; await fetchNotifications(); };
+    load();
+    const t = setInterval(load, 15000);
+    const onVis = () => { if (document.visibilityState === 'visible') fetchNotifications(); };
+    document.addEventListener('visibilitychange', onVis);
+    return () => { mounted = false; clearInterval(t); document.removeEventListener('visibilitychange', onVis); };
+  }, [fetchNotifications]);
+
   const markPaid = async (id: string) => {
     try {
       setProcessing(true);
+      // Persist paid status
       await paymentService.updatePayment(id, { status: 'paid', payment_date: new Date() as any });
+      // Reflect in lists
+      setAllPayments((prev) => prev.map((p) => (String(p._id || p.id) === id ? { ...p, status: 'paid', payment_date: new Date() } : p)));
       setApprovedPayments((prev) => prev.filter((p) => (p._id || p.id) !== id));
+      // Create manager-facing report for audit trail
+      try {
+        const amt = Number(selectedPayment?.amount || 0);
+        await reportService.createReport({
+          type: 'payment_report',
+          date_range_start: new Date() as any,
+          date_range_end: new Date() as any,
+          data: {
+            category: 'payment_processed',
+            payment_id: id,
+            farmer_id: String(selectedPayment?.farmer_id || ''),
+            amount: amt,
+            method: payMethod,
+            reference: payRef,
+            sent_to: 'manager',
+          },
+        } as any);
+      } catch {}
       setShowProcessModal(false);
       setSelectedPayment(null);
       setPayRef('');
@@ -185,9 +310,9 @@ const FinancialManagerDashboard: React.FC = () => {
       alert('No approved payments to process yet. Approve a request first.');
       return;
     }
-    approvedRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    setHighlightApproved(true);
-    setTimeout(() => setHighlightApproved(false), 1500);
+    // Open processing modal with the first approved payment selected
+    setSelectedPayment(approvedPayments[0]);
+    setShowProcessModal(true);
   };
   const loadBudgetRequests = async () => {
     try {
@@ -213,6 +338,56 @@ const FinancialManagerDashboard: React.FC = () => {
   const handleBudgetPlanning = () => {
     setShowBudgetModal(true);
     loadBudgetRequests();
+  };
+  const sendBudgetForApproval = async (r: any) => {
+    try {
+      setActionError('');
+      setActionMessage('');
+      const items = r?.data?.items || {};
+      const total = Number(r?.data?.total_amount || 0);
+      const notes = `Budget approval request for ${new Date().toLocaleString()} — total ${formatUGX(total)}.`;
+      await reportService.createReport({
+        type: 'payment_report',
+        date_range_start: new Date().toISOString(),
+        date_range_end: new Date().toISOString(),
+        notes: `${notes}`,
+        data: {
+          category: 'budget_request',
+          items,
+          total_amount: total,
+          sent_to: 'manager',
+          generated_by: 'finance'
+        }
+      } as any);
+      setActionMessage('Budget sent to Manager for approval.');
+    } catch (e: any) {
+      setActionError(String(e?.message || 'Failed to send budget for approval'));
+    }
+  };
+  const sendBudgetBackToFieldOfficer = async (r: any) => {
+    try {
+      setActionError('');
+      setActionMessage('');
+      const items = r?.data?.items || {};
+      const total = Number(r?.data?.total_amount || 0);
+      const notes = `Budget sent back to Field Officer on ${new Date().toLocaleString()} — total ${formatUGX(total)}.`;
+      await reportService.createReport({
+        type: 'payment_report',
+        date_range_start: new Date().toISOString(),
+        date_range_end: new Date().toISOString(),
+        notes,
+        data: {
+          category: 'budget_feedback',
+          items,
+          total_amount: total,
+          sent_to: 'field_officer',
+          generated_by: 'finance'
+        }
+      } as any);
+      setActionMessage('Budget sent back to Field Officer.');
+    } catch (e: any) {
+      setActionError(String(e?.message || 'Failed to send back'));
+    }
   };
   // Financial KPIs data
   const financialKPIs = [
@@ -282,6 +457,25 @@ const FinancialManagerDashboard: React.FC = () => {
     ];
   }, [allPayments]);
 
+  // Crop distribution from harvests (by tons)
+  const cropDistributionData = React.useMemo(() => {
+    const map = new Map<string, number>();
+    (harvests || []).forEach((h: any) => {
+      const name = (String(h.crop_type || h.crop_name || h.crop || 'Other').trim()) || 'Other';
+      const qty = Number(h.quantity_tons || h.quantity || h.qty || 0);
+      if (!qty) return;
+      map.set(name, (map.get(name) || 0) + qty);
+    });
+    const palette = ['#8B5CF6', '#10B981', '#F59E0B', '#EF4444', '#3B82F6', '#22C55E', '#A855F7', '#EAB308', '#06B6D4', '#F97316'];
+    const sorted = Array.from(map.entries()).sort((a, b) => b[1] - a[1]);
+    const main = sorted.slice(0, 6).map(([name, value], i) => ({ name, value: Math.round(value * 10) / 10, color: palette[i % palette.length] }));
+    if (sorted.length > 6) {
+      const others = sorted.slice(6).reduce((s, [, v]) => s + v, 0);
+      if (others > 0) main.push({ name: 'Others', value: Math.round(others * 10) / 10, color: '#6B7280' });
+    }
+    return main;
+  }, [harvests]);
+
   // ROI by crop data
   const roiData = [
     { crop: 'Wheat', roi: 18.5, investment: 250000, returns: 296250 },
@@ -299,58 +493,126 @@ const FinancialManagerDashboard: React.FC = () => {
     { id: 4, type: 'warning', message: 'Utility costs increased by 12%', priority: 'medium' }
   ];
 
+  // Scoped pretty scrollbar for this page only (attach to html/body)
+  React.useEffect(() => {
+    const style = document.createElement('style');
+    style.textContent = `
+      .finance-page-scroll { overflow-y: auto !important; }
+      .finance-page-scroll { scrollbar-width: thin; scrollbar-color: #94a3b8 transparent; }
+      .finance-page-scroll::-webkit-scrollbar { width: 10px; }
+      .finance-page-scroll::-webkit-scrollbar-track { background: transparent; }
+      .finance-page-scroll::-webkit-scrollbar-thumb { background-color: rgba(148,163,184,0.7); border-radius: 9999px; border: 2px solid transparent; background-clip: content-box; }
+      .finance-page-scroll::-webkit-scrollbar-thumb:hover { background-color: rgba(100,116,139,0.9); }
+    `;
+    document.head.appendChild(style);
+    document.documentElement.classList.add('finance-page-scroll');
+    document.body.classList.add('finance-page-scroll');
+    return () => { document.head.removeChild(style); };
+  }, []);
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header */}
-      <div className="bg-white shadow-sm border-b">
+    <div
+      className="h-screen overflow-y-scroll scroll-smooth finance-scroll"
+      style={{
+        background:
+          'linear-gradient(180deg, #D6F4F1 0%, #DFF6F3 38%, #EAFBFA 100%)'
+      }}
+    >
+      {/* Header (standard sticky navbar) */}
+      <div className="sticky top-0 z-40 bg-white/80 backdrop-blur-md shadow-lg border-b border-teal-100">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex justify-between items-center py-4">
-            <div className="flex items-center space-x-4">
-              <div className="flex items-center space-x-2">
-                <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
-                  <span className="text-white font-bold text-sm">🌾</span>
-                </div>
+            {/* Brand */}
+            <div className="flex items-center gap-3">
+              <div className="w-9 h-9 bg-green-600 rounded flex items-center justify-center">
+                <span className="text-white font-bold text-base">🌾</span>
+              </div>
+              <div className="flex flex-col leading-tight">
+                <span className="text-sm tracking-wide text-gray-500">FARMER MANAGEMENT</span>
+                <span className="text-lg font-semibold text-gray-900">Finance Dashboard</span>
+              </div>
+            </div>
 
-            {/* Approved Payments to Process */}
-            <div ref={approvedRef} className={`bg-white rounded-lg shadow-sm p-6 ${highlightApproved ? 'ring-2 ring-purple-400' : ''}` }>
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Approved Payments</h2>
-                {apLoading && <span className="text-sm text-gray-500">Loading...</span>}
-              </div>
-              {apError && <p className="text-sm text-red-600 mb-3">{apError}</p>}
-              {approvedPayments.length === 0 && !apLoading ? (
-                <p className="text-sm text-gray-600">No approved payments to process.</p>
-              ) : (
-                <div className="space-y-3">
-                  {approvedPayments.slice(0,6).map((p) => {
-                    const f = farmers.find((x) => String(x._id) === String(p.farmer_id));
-                    return (
-                      <div key={(p._id || p.id) as string} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-                        <div className="text-sm text-gray-800">
-                          <div className="font-medium">{f?.name || f?.full_name || f?.first_name || 'Farmer'} <span className="text-gray-500">({String(p.farmer_id)})</span></div>
-                          <div className="text-gray-600">Amount: {formatUGX(Number(p.amount))}</div>
-                        </div>
-                        <button
-                          onClick={() => openProcess(p)}
-                          className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-md text-sm"
-                        >
-                          Process
-                        </button>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
-                <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
-                <span className="text-sm text-gray-500">System</span>
-              </div>
-            </div>
+            {/* Primary nav links (non-routing anchors) */}
+            <nav className="hidden md:flex items-center gap-6 text-sm text-gray-600">
+              <a href="#overview" className="hover:text-gray-900">Overview</a>
+              <a href="#payments" className="hover:text-gray-900">Payments</a>
+              <a href="#budgets" className="hover:text-gray-900">Budgets</a>
+              <a href="#reports" className="hover:text-gray-900">Reports</a>
+            </nav>
+
+            {/* Actions */}
             <div className="flex items-center space-x-4">
-              <h1 className="text-2xl font-bold text-gray-900">Financial Dashboard</h1>
-              <button className="p-2 bg-gray-100 rounded-lg">
-                <span className="text-lg">🔔</span>
-              </button>
+              <div className="relative">
+                <button
+                  onClick={async ()=>{ await fetchNotifications(); setShowNotifications((s)=>!s); setUnreadCount(0); }}
+                  className="p-2 bg-gray-100 rounded-lg relative"
+                  title="Notifications"
+                >
+                  <span className="text-lg">🔔</span>
+                  {unreadCount > 0 && (
+                    <span className="absolute -top-1 -right-1 w-3 h-3 bg-red-500 rounded-full"></span>
+                  )}
+                </button>
+                {showNotifications && (
+                  <div className="absolute right-0 mt-2 w-96 max-h-96 overflow-auto bg-white rounded-xl shadow-xl border p-3 z-50">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="text-sm font-semibold">Notifications</div>
+                      <button onClick={()=>setShowNotifications(false)} className="text-xs text-gray-600 hover:underline">Close</button>
+                    </div>
+                    {notifications.length === 0 ? (
+                      <div className="text-xs text-gray-600 p-3 bg-gray-50 rounded-lg">No notifications</div>
+                    ) : (
+                      <div className="space-y-2">
+                        {notifications.map((n)=> (
+                          <button key={n.id} onClick={()=> setSelectedNotification(n)} className="w-full text-left p-2 bg-gray-50 rounded-lg border hover:bg-gray-100">
+                            <div className="text-sm font-medium flex items-center gap-2">
+                              <span className={n.from==='manager' ? 'text-purple-600' : (n.type==='budget' ? 'text-amber-600' : 'text-blue-600')}>
+                                {n.from==='manager' ? '👔' : (n.type==='budget' ? '📑' : '💸')}
+                              </span>
+                              {n.title}
+                            </div>
+                            {n.desc && <div className="text-xs text-gray-600 mt-0.5">{n.desc}</div>}
+                            {n.date && <div className="text-[10px] text-gray-500 mt-0.5">{new Date(n.date).toLocaleString()}</div>}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                )}
+                {selectedNotification && (
+                  <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-[60]">
+                    <div className="bg-white rounded-xl shadow-2xl w-full max-w-md p-6" id="printable-notif">
+                      <div className="flex items-center justify-between mb-3">
+                        <h3 className="text-lg font-semibold">Notification Details</h3>
+                        <button onClick={()=> setSelectedNotification(null)} className="px-3 py-1.5 rounded bg-gray-100 hover:bg-gray-200 text-gray-700 text-sm">Close</button>
+                      </div>
+                      <div className="space-y-2 text-sm">
+                        <div><span className="text-gray-500">From:</span> <span className="font-medium capitalize">{selectedNotification.from.replace('_',' ')}</span></div>
+                        <div className="font-medium">{selectedNotification.title}</div>
+                        {selectedNotification.desc && <div className="text-gray-700">{selectedNotification.desc}</div>}
+                        {selectedNotification.date && <div className="text-xs text-gray-500">{new Date(selectedNotification.date).toLocaleString()}</div>}
+                      </div>
+                      <div className="mt-4 flex justify-end gap-2">
+                        <button
+                          onClick={() => {
+                            const node = document.getElementById('printable-notif');
+                            if (!node) return window.print();
+                            const w = window.open('', '_blank', 'width=800,height=600');
+                            if (!w) return;
+                            w.document.write(`<html><head><title>Notification</title></head><body>${node.innerHTML}</body></html>`);
+                            w.document.close();
+                            w.focus();
+                            w.print();
+                            w.close();
+                          }}
+                          className="px-4 py-2 rounded bg-blue-600 hover:bg-blue-700 text-white"
+                        >Print</button>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              </div>
               <div className="w-8 h-8 bg-gray-300 rounded-full"></div>
               {/* Logout Button */}
               <button 
@@ -364,76 +626,38 @@ const FinancialManagerDashboard: React.FC = () => {
           </div>
         </div>
 
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6">
-        {/* Financial KPIs */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {financialKPIs.map((kpi, index) => (
-            <div key={index} className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-gray-600">{kpi.title}</p>
-                  <p className="text-3xl font-bold text-gray-900">{kpi.value}</p>
-                  <div className="flex items-center mt-2">
-                    {kpi.trend === 'up' ? (
-                      <TrendingUp className="w-4 h-4 text-green-600 mr-1" />
-                    ) : (
-                      <TrendingDown className="w-4 h-4 text-red-600 mr-1" />
-                    )}
-                    <p className={`text-sm ${kpi.trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                      {kpi.change}
-                    </p>
-                  </div>
-                </div>
-                <div className="p-3 bg-gray-100 rounded-lg">
-                  <kpi.icon className="w-6 h-6 text-gray-600" />
-                </div>
-              </div>
-            </div>
-          ))}
+      {/* Main content */}
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 pt-6 pb-40">
+        {/* Cash Flow Out Card */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-xl shadow-sm border p-6 aspect-square h-40 flex flex-col justify-between">
+            <div className="text-sm text-gray-600">Cash Flow Out</div>
+            <div className="text-3xl font-bold text-gray-900">{currency(totalCashOut)}</div>
+            <div className="text-xs text-gray-500">Total paid to farmers</div>
+          </div>
         </div>
 
-        {/* Summary Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4 mb-6">
-          <div className="bg-white rounded-lg shadow-sm p-4 border">
-            <p className="text-xs text-gray-500">Total Due</p>
-            <p className="text-xl font-semibold text-gray-900">{currency(totalDueAll)}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-4 border">
-            <p className="text-xs text-gray-500">Pending</p>
-            <p className="text-xl font-semibold text-gray-900">{pendingCount}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-4 border">
-            <p className="text-xs text-gray-500">Verified</p>
-            <p className="text-xl font-semibold text-gray-900">{approvedCount}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-4 border">
-            <p className="text-xs text-gray-500">Paid</p>
-            <p className="text-xl font-semibold text-gray-900">{paidCount}</p>
-          </div>
-          <div className="bg-white rounded-lg shadow-sm p-4 border">
-            <p className="text-xs text-gray-500">Farmers</p>
-            <p className="text-xl font-semibold text-gray-900">{farmersCount}</p>
-          </div>
-        </div>
+        <></>
 
         {/* Main Content Grid */}
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
           {/* Farmers Payment Overview */}
-          <div className="lg:col-span-3 bg-white rounded-lg shadow-sm p-6">
+          <div className="lg:col-span-3 bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold">Farmers Payment Overview</h2>
               <span className="text-sm text-gray-500">Summary of dues and statuses</span>
             </div>
-            <div className="overflow-x-auto">
-              <table className="min-w-full text-sm border rounded-lg overflow-hidden">
+            <div className="overflow-x-auto rounded-lg border border-gray-100">
+              <table className="min-w-full text-sm">
                 <thead>
-                  <tr className="text-left text-gray-600 bg-gray-50 border-b">
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Farmer Name / ID</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Total Amount Due</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Last Payment Date</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Payment Status</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Bank/Mobile Money Details</th>
-                    <th className="py-2 pr-4 text-xs uppercase tracking-wide">Actions</th>
+                  <tr className="text-left text-gray-700 bg-gray-50 border-b border-gray-100">
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Farmer Name / ID</th>
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Total Amount Due</th>
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Total Paid</th>
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Last Payment Date</th>
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Payment Status</th>
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Bank/Mobile Money Details</th>
+                    <th className="py-3 px-4 text-xs font-semibold uppercase tracking-wide whitespace-nowrap">Actions</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -442,6 +666,9 @@ const FinancialManagerDashboard: React.FC = () => {
                     const pays = allPayments.filter((p) => String(p.farmer_id) === fId);
                     const totalDue = pays
                       .filter((p) => p.status === 'pending' || p.status === 'approved')
+                      .reduce((sum, p) => sum + Number(p.amount || 0), 0);
+                    const totalPaid = pays
+                      .filter((p) => p.status === 'paid')
                       .reduce((sum, p) => sum + Number(p.amount || 0), 0);
                     const paidDates = pays
                       .filter((p) => p.status === 'paid' && p.payment_date)
@@ -452,19 +679,20 @@ const FinancialManagerDashboard: React.FC = () => {
                     const status = hasPending ? 'Pending' : hasApproved ? 'Verified' : (pays.some((p) => p.status === 'paid') ? 'Paid' : '—');
                     const pendingForFarmer = pays.filter((p) => p.status === 'pending');
                     return (
-                      <tr key={fId} className="border-t even:bg-gray-50/50 hover:bg-gray-50">
-                        <td className="py-2 pr-4 font-medium text-gray-900">{f.name || 'Farmer'} <span className="text-gray-500">({fId})</span></td>
-                        <td className="py-2 pr-4">{currency(totalDue)}</td>
-                        <td className="py-2 pr-4">{lastPaid ? lastPaid.toLocaleDateString() : '—'}</td>
-                        <td className="py-2 pr-4">{renderStatusBadge(status.toLowerCase())}</td>
-                        <td className="py-2 pr-4">{f.contact || '—'}</td>
-                        <td className="py-2 pr-4">
+                      <tr key={fId} className="border-t border-gray-100 even:bg-gray-50/40 hover:bg-gray-50 transition-colors">
+                        <td className="py-3 px-4 font-medium text-gray-900">{f.name || 'Farmer'} <span className="text-gray-500">({fId})</span></td>
+                        <td className="py-3 px-4 text-right font-mono tabular-nums">{currency(totalDue)}</td>
+                        <td className="py-3 px-4 text-right font-mono tabular-nums">{currency(totalPaid)}</td>
+                        <td className="py-3 px-4">{lastPaid ? lastPaid.toLocaleDateString() : '—'}</td>
+                        <td className="py-3 px-4">{renderStatusBadge(status.toLowerCase())}</td>
+                        <td className="py-3 px-4 max-w-[220px] truncate">{f.contact || '—'}</td>
+                        <td className="py-3 px-4">
                           {pendingForFarmer.length > 0 ? (
                             <div className="space-y-1">
                               {pendingForFarmer.slice(0,3).map((p) => (
-                                <div key={String(p._id)} className="flex items-center justify-between bg-gray-50 rounded px-2 py-1 border">
-                                  <span>Req: {currency(Number(p.amount))}</span>
-                                  <button onClick={() => approvePending(String(p._id || p.id))} className="px-2 py-0.5 bg-green-600 hover:bg-green-700 text-white rounded text-xs">Approve</button>
+                                <div key={String(p._id)} className="flex items-center justify-between bg-gray-50 rounded-md px-2 py-1 border border-gray-100">
+                                  <span className="text-gray-700">Req: {currency(Number(p.amount))}</span>
+                                  <button onClick={() => approvePending(String(p._id || p.id))} className="px-2.5 py-1 bg-green-600 hover:bg-green-700 text-white rounded-md text-xs font-medium shadow-sm">Approve</button>
                                 </div>
                               ))}
                               {pendingForFarmer.length > 3 && (
@@ -487,66 +715,8 @@ const FinancialManagerDashboard: React.FC = () => {
               </table>
             </div>
           </div>
-          {/* Left Column - Revenue Trends and Budget */}
+          {/* Left Column - Budget only */}
           <div className="lg:col-span-2 space-y-8">
-            {/* Revenue and Profit Trends */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Revenue & Profit Trends</h2>
-                <select className="text-sm border border-gray-300 rounded px-3 py-1">
-                  <option>Last 12 Months</option>
-                  <option>Last 6 Months</option>
-                  <option>Last 3 Months</option>
-                </select>
-              </div>
-              
-              <div className="h-80">
-                <ResponsiveContainer width="100%" height="100%">
-                  <LineChart data={revenueData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="month" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [formatUGX(Number(value)), '']} />
-                    <Line 
-                      type="monotone" 
-                      dataKey="revenue" 
-                      stroke="#3b82f6" 
-                      strokeWidth={3}
-                      name="Revenue"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="profit" 
-                      stroke="#22c55e" 
-                      strokeWidth={3}
-                      name="Profit"
-                    />
-                    <Line 
-                      type="monotone" 
-                      dataKey="expenses" 
-                      stroke="#ef4444" 
-                      strokeWidth={3}
-                      name="Expenses"
-                    />
-                  </LineChart>
-                </ResponsiveContainer>
-              </div>
-
-              <div className="flex justify-center space-x-6 mt-4">
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span className="text-sm">Revenue</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span className="text-sm">Profit</span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <div className="w-3 h-3 rounded-full bg-red-500"></div>
-                  <span className="text-sm">Expenses</span>
-                </div>
-              </div>
-            </div>
 
             {/* Budget Allocation (live, updates when you plan) */}
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -589,25 +759,10 @@ const FinancialManagerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* ROI by Crop */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <h2 className="text-xl font-semibold mb-6">ROI by Crop Type</h2>
-              
-              <div className="h-64">
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={roiData}>
-                    <CartesianGrid strokeDasharray="3 3" />
-                    <XAxis dataKey="crop" />
-                    <YAxis />
-                    <Tooltip formatter={(value) => [`${value}%`, 'ROI']} />
-                    <Bar dataKey="roi" fill="#22c55e" name="ROI %" />
-                  </BarChart>
-                </ResponsiveContainer>
-              </div>
-            </div>
+            
           </div>
 
-          {/* Right Column - Payment Status and Alerts */}
+          {/* Right Column - Payment Status and Actions */}
           <div className="space-y-8">
             {/* Payment Status */}
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -652,44 +807,7 @@ const FinancialManagerDashboard: React.FC = () => {
               </div>
             </div>
 
-            {/* Financial Alerts */}
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-semibold">Financial Alerts</h2>
-                <button className="text-sm text-blue-600 hover:text-blue-800">View All</button>
-              </div>
-
-              <div className="space-y-4">
-                {financialAlerts.map((alert) => (
-                  <div
-                    key={alert.id}
-                    className={`p-4 rounded-lg border-l-4 ${
-                      alert.type === 'danger' ? 'bg-red-50 border-red-500' :
-                      alert.type === 'warning' ? 'bg-yellow-50 border-yellow-500' :
-                      'bg-blue-50 border-blue-500'
-                    }`}
-                  >
-                    <div className="flex items-start space-x-3">
-                      <AlertTriangle className={`w-5 h-5 mt-0.5 ${
-                        alert.type === 'danger' ? 'text-red-500' :
-                        alert.type === 'warning' ? 'text-yellow-500' :
-                        'text-blue-500'
-                      }`} />
-                      <div className="flex-1">
-                        <p className="text-sm font-medium text-gray-900">{alert.message}</p>
-                        <p className={`text-xs mt-1 ${
-                          alert.priority === 'high' ? 'text-red-600' :
-                          alert.priority === 'medium' ? 'text-yellow-600' :
-                          'text-blue-600'
-                        }`}>
-                          Priority: {alert.priority}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
+            
 
             {/* Quick Financial Actions */}
             <div className="bg-white rounded-lg shadow-sm p-6">
@@ -822,7 +940,31 @@ const FinancialManagerDashboard: React.FC = () => {
                         {r.data?.notes && (
                           <div className="mt-2 text-xs text-gray-600">Notes: {r.data.notes}</div>
                         )}
-                        <div className="mt-3 flex justify-end gap-2">
+                        <div className="mt-3 flex justify-end gap-2 relative">
+                          <div className="relative">
+                            <button
+                              className="px-3 py-1.5 rounded bg-amber-600 hover:bg-amber-700 text-white text-sm flex items-center gap-1"
+                              onClick={() => {
+                                const id = String(r._id || r.id || r.created_at || Math.random());
+                                setOpenSendMenuId(prev => prev === id ? null : id);
+                              }}
+                            >
+                              Send
+                              <svg className="w-3 h-3 ml-1" viewBox="0 0 20 20" fill="currentColor"><path d="M5.23 7.21a.75.75 0 011.06.02L10 10.94l3.71-3.71a.75.75 0 111.06 1.06l-4.24 4.24a.75.75 0 01-1.06 0L5.21 8.29a.75.75 0 01.02-1.08z"/></svg>
+                            </button>
+                            {openSendMenuId === String(r._id || r.id || r.created_at || '') && (
+                              <div className="absolute right-0 mt-1 w-44 bg-white border border-gray-200 rounded shadow-md z-10">
+                                <button
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                  onClick={() => { setOpenSendMenuId(null); sendBudgetForApproval(r); }}
+                                >Send to Manager</button>
+                                <button
+                                  className="w-full text-left px-3 py-2 text-sm hover:bg-gray-100"
+                                  onClick={() => { setOpenSendMenuId(null); sendBudgetBackToFieldOfficer(r); }}
+                                >Send back to Field Officer</button>
+                              </div>
+                            )}
+                          </div>
                           <button className="px-3 py-1.5 rounded bg-blue-600 hover:bg-blue-700 text-white text-sm" onClick={() => {
                             setPlanningRequest(r);
                             const it = r?.data?.items || {};
@@ -944,6 +1086,25 @@ const FinancialManagerDashboard: React.FC = () => {
           <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-6">
             <h3 className="text-lg font-semibold mb-4">Process Payment</h3>
             <div className="space-y-3 text-sm">
+              {approvedPayments && approvedPayments.length > 1 && (
+                <div>
+                  <label className="block text-gray-700 mb-1">Select Approved Payment</label>
+                  <select
+                    className="w-full border rounded px-3 py-2"
+                    value={String((selectedPayment._id || selectedPayment.id))}
+                    onChange={(e) => {
+                      const sel = approvedPayments.find((x:any) => String(x._id || x.id) === e.target.value);
+                      if (sel) setSelectedPayment(sel);
+                    }}
+                  >
+                    {approvedPayments.map((p:any) => (
+                      <option key={String(p._id || p.id)} value={String(p._id || p.id)}>
+                        {String(p.farmer_id)} · {formatUGX(Number(p.amount))}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div className="flex justify-between"><span className="text-gray-600">Farmer ID</span><span className="font-medium">{String(selectedPayment.farmer_id)}</span></div>
               <div className="flex justify-between"><span className="text-gray-600">Amount</span><span className="font-medium">{formatUGX(Number(selectedPayment.amount))}</span></div>
               <div>

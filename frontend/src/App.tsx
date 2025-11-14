@@ -1,4 +1,6 @@
 import Dashboard from './components/Dashboard'
+import FinancialManagerDashboard from './components/FinancialManagerDashboardNew'
+
 import AuthPage from './components/AuthPage'
 import { ThemeProvider } from './contexts/ThemeContext'
 import { WallpaperProvider } from './contexts/WallpaperContext'
@@ -19,7 +21,15 @@ function AppContent() {
     );
   }
 
-  return user ? <Dashboard /> : <AuthPage />;
+  if (!user) return <AuthPage />;
+
+  // Lightweight routing: allow direct access to Finance page at /finance
+  const path = typeof window !== 'undefined' ? window.location.pathname : '';
+  if (path === '/finance' && user?.role === 'finance') {
+    return <FinancialManagerDashboard />;
+  }
+
+  return <Dashboard />;
 }
 
 function App() {

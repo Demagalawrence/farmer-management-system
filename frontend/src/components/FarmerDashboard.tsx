@@ -37,7 +37,7 @@ const FarmerDashboard: React.FC = () => {
                 <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
                   <span className="text-white font-bold text-sm">🌾</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
+                <span className="text-xl font-bold text-gray-900">FARMER MANAGEMENT</span>
                 <span className="text-sm text-gray-500">System</span>
               </div>
             </div>

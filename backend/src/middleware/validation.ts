@@ -76,9 +76,14 @@ export const schemas = {
     // Backward-compat fields (optional)
     field_name: Joi.string().min(2).max(100).optional(),
     crop_type: Joi.string().min(2).max(100).optional(),
+    crop_name: Joi.string().min(2).max(100).optional(),
+    variety: Joi.string().min(1).max(120).optional(),
+    expected_yield_kg: Joi.number().positive().optional(),
     area: Joi.number().positive().optional(),
     planting_date: Joi.date().iso().optional(),
     expected_harvest_date: Joi.date().iso().optional(),
+    visit_type: Joi.string().valid('planting','monitoring','harvest').optional(),
+    notes: Joi.string().max(1000).optional(),
   }),
 
   updateField: Joi.object({

@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { getDb } from '../config/db';
 import { User } from '../models/User';
 import { generateToken } from '../middleware/auth';
@@ -75,12 +76,17 @@ export class AuthController {
       throw new ValidationError('Access code is required for this role');
     }
 
-    // For manager role, use admin secret instead of dynamic codes
-    if (role === 'manager') {
-      const adminSecret = process.env.ADMIN_SECRET || 'admin123';
-      if (accessCode !== adminSecret) {
-        throw new AuthenticationError('Invalid admin secret. Manager accounts require the admin secret to create.');
+    const adminSecret = process.env.ADMIN_SECRET || 'admin123';
+
+    // If accessCode equals the admin secret, allow for manager, finance, and field_officer
+    if (accessCode === adminSecret) {
+      if (!['manager', 'finance', 'field_officer'].includes(role)) {
+        throw new ValidationError('Invalid role specified for admin secret');
       }
+      // Bypass dynamic access code checks
+    } else if (role === 'manager') {
+      // Manager must use the admin secret
+      throw new AuthenticationError('Invalid admin secret. Manager accounts require the admin secret to create.');
     } else {
       // For field_officer and finance, use dynamic access codes from database
       const activeCode = await db.collection('access_codes').findOne({
@@ -153,6 +159,17 @@ export class AuthController {
 
     const result = await db.collection('users').insertOne(newUser);
 
+    // Create a single-use backup code for account recovery
+    const backupPlain = `${crypto.randomBytes(3).toString('hex').toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const backupHash = await bcrypt.hash(backupPlain, 10);
+    await db.collection('backup_codes').insertOne({
+      user_id: result.insertedId,
+      email,
+      code_hash: backupHash,
+      used: false,
+      created_at: new Date(),
+    });
+
     // Generate JWT token for auto-login
     const token = generateToken({
       id: result.insertedId.toString(),
@@ -168,6 +185,55 @@ export class AuthController {
       message: 'User created successfully',
       token,
       userId: result.insertedId,
+      backup_code: backupPlain,
+    });
+  });
+
+  // Login using backup code (account recovery)
+  loginWithBackup = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { email, backupCode } = req.body as { email: string; backupCode: string };
+
+    if (!email || !backupCode) {
+      throw new ValidationError('Email and backup code are required');
+    }
+
+    const db = getDb();
+    const user = await db.collection('users').findOne({ email });
+    if (!user) {
+      throw new AuthenticationError('Invalid email or backup code');
+    }
+
+    // Find a not-yet-used backup code for this user/email
+    const record = await db.collection('backup_codes').findOne({ email, used: false });
+    if (!record) {
+      throw new AuthenticationError('Backup code not found or already used');
+    }
+
+    const ok = await bcrypt.compare(backupCode, record.code_hash);
+    if (!ok) {
+      throw new AuthenticationError('Invalid email or backup code');
+    }
+
+    // Mark as used and issue a fresh JWT
+    await db.collection('backup_codes').updateOne(
+      { _id: record._id },
+      { $set: { used: true, used_at: new Date() } }
+    );
+
+    const token = generateToken({
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    });
+
+    const { password_hash, ...userResponse } = user as any;
+
+    res.json({
+      success: true,
+      message: 'Logged in with backup code. Please change your password.',
+      token,
+      user: userResponse,
     });
   });
 

@@ -1,0 +1,96 @@
+Farmer Management System - Project Report
+
+Date: 2025-11-11
+
+1) Overview
+- A full-stack web application to manage farmers, fields (crops), harvests, payments, and finance workflows.
+- Frontend: React + TypeScript, Axios API client, Recharts, Lucide icons, Tailwind-like utility classes.
+- Backend: Node.js + Express (TypeScript), MongoDB (native driver). JWT authentication via axios interceptor.
+
+2) Key Backend Modules
+- Database: backend/src/config/db.ts (connectToDatabase, index creation, mock fallback)
+- Models: User, Farmer, Field, Harvest, Payment, Report
+- Services & Controllers: CRUD and business logic per entity
+- Routes (mounted in server.ts under /api):
+  • /api/auth
+  • /api/users
+  • /api/farmers
+  • /api/fields
+  • /api/harvests
+  • /api/payments
+  • /api/reports
+  • /api/search
+  • /api/finance
+
+3) Field (Crop) Data Flow
+- Model (Field) supports: farmer_id, location, size_hectares, crop_stage, health_status, crop_type, variety, planting_date, expected_yield_kg, visit_type, notes, created_at.
+- Validation (createField) accepts ObjectId or numeric external_id for farmer_id and supports crop_name alias.
+- Controller normalizes crop_name -> crop_type on create.
+- Endpoints used by Field Officer dashboard:
+  • POST /api/fields
+  • GET /api/fields
+
+4) Frontend Modules (Selected)
+- Services: src/services/* (api.ts, fieldService.ts, harvestService.ts, paymentService.ts, farmerService.ts, userService.ts)
+- Dashboards:
+  • FieldOfficerDashboardExact.tsx: Record Field Data modal now includes visit_type, crop_name (alias for crop_type), variety, planting_date, expected_yield_kg, notes. After save, dashboard refreshes and the "My Crops" widget reflects entries from fields/harvests.
+  • FinancialManagerDashboardNew.tsx: Removed KPI/summary cards; added a square "Cash Flow Out" card that sums amounts of paid payments.
+  • ManagerDashboardNew.tsx: Top cards are now dynamic — Active Farms (derived from fields with healthy/needs_attention) and Total Workers (users with role field_officer).
+
+5) Recent Changes Implemented
+- Backend
+  • Field model expanded with crop_type, variety, expected_yield_kg, planting_date, visit_type, notes.
+  • createField validation updated to accept crop_name (alias) and new optional properties.
+  • Controller normalizes crop_name to crop_type at creation.
+- Frontend
+  • Field Officer: extended Record Field Data modal with visit type, variety/cultivar, planting date, expected yield, notes; send these to backend; show in My Crops.
+  • Finance: removed old KPI cards and summary; added "Cash Flow Out" square card.
+  • Manager: dynamic top cards for Active Farms and Total Workers (field officers) with live refresh.
+
+6) Data and Auth Expectations
+- All API calls require Authorization: Bearer <token>. The axios interceptor reads token from localStorage.
+- farmer_id in POST /api/fields can be:
+  • 24-char Mongo ObjectId of the farmer document, or
+  • numeric/numeric-string matching farmers.external_id.
+
+7) How to Run
+Backend
+- Prerequisites: Node.js, MongoDB running (default uri: mongodb://localhost:27017), db name: fmis.
+- Env (optional): MONGODB_URI, DB_NAME, ENABLE_AUTO_BACKUP.
+- Commands (from backend folder):
+  • npm install
+  • npm run build (if applicable) / npm run dev for development server
+  • Server default port: 5000; health: GET /health
+
+Frontend
+- Prerequisites: Node.js
+- Commands (from frontend folder):
+  • npm install
+  • npm start (or npm run dev depending on setup)
+- API base: http://localhost:5000/api (see src/services/api.ts)
+
+8) Primary Collections and Indexes (db.ts)
+- users: { email: 1 (unique), role: 1 }
+- farmers: { user_id: 1 }, { status: 1 }, { external_id: 1 (unique, sparse) }
+- fields: { farmer_id: 1 }, { health_status: 1 }, { crop_stage: 1 }, { external_code: 1 (unique, sparse) }
+- harvests: { farmer_id: 1 }, { field_id: 1 }, { harvest_date: 1 }
+- payments: { farmer_id: 1 }, { status: 1 }, { harvest_id: 1 (unique, partial) }
+- reports: { type: 1 }, { generated_by: 1 }
+
+9) Notable UI Behaviors
+- Field Officer: After creating a field, the dashboard refreshes and My Crops aggregates by crop names from fields and by harvest totals.
+- Finance: Cash Flow Out reflects sum of paid payments; table shows approved/pending items.
+- Manager: Cards compute live values; map displays farmer and field markers; can open work rates per farmer.
+
+10) Suggested Next Enhancements
+- Add officer_id to fields to filter fields by logged-in officer (GET /api/fields?officer=me) and provide a /api/fields/summary endpoint for faster dashboard summaries.
+- Add worker roles if needed beyond field_officer and align worker counts by role set.
+- Add pagination and server-side filtering on listing endpoints.
+- Improve error surfaces in UI (toast/inline) for all CRUD flows.
+
+11) Quick Troubleshooting
+- If My Crops shows "No crops yet": ensure farmer exists and farmer_id resolves; verify token present; check POST /api/fields response (201 expected).
+- If Finance totals look off: confirm payment status changes to 'paid'; verify amounts are numeric.
+- If Manager cards display 0: ensure users endpoint returns roles; ensure fields exist and have health_status.
+
+End of report.
