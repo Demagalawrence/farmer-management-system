@@ -113,9 +113,7 @@ cd frontend
 npm run build
 ```
 
-## API Documentation
 
-See [backend/README.md](backend/README.md) for detailed API documentation.
 
 ## License
 
