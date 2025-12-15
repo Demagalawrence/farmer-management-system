@@ -82,7 +82,7 @@ A comprehensive system for managing farmers, fields, harvests, payments, and rep
 
 2. Make sure MongoDB is running on your system
 
-### Running the Application
+
 
 #### Start the Backend Server
 ```bash
