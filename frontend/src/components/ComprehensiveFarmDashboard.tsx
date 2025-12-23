@@ -137,7 +137,7 @@ const ComprehensiveFarmDashboard: React.FC = () => {
             <div className="space-y-2">
               <div className="flex items-center space-x-3 text-white/80">
                 <div className="w-6 h-6 bg-white/20 rounded-full"></div>
-                <span className="text-sm">Farmers</span>
+                <span className="text-sm">Farmer</span>
               </div>
               <div className="flex items-center space-x-3 text-white/80">
                 <div className="w-6 h-6 bg-white/20 rounded-full"></div>
