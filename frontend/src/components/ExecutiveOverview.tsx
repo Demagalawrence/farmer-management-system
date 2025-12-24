@@ -79,7 +79,7 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({
       <div className="bg-white rounded-lg shadow-sm p-6">
         <h2 className="text-xl font-bold mb-4 text-gray-800">⚙️ Operational Status</h2>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          {/* Tasks Summary */}
+          {/* Task Summary */}
           <div className="p-4 bg-yellow-50 rounded-lg border border-yellow-200">
             <h3 className="font-semibold text-gray-800 mb-3">Active & Pending Tasks</h3>
             <div className="space-y-2">
@@ -122,7 +122,7 @@ export const ExecutiveOverview: React.FC<ExecutiveOverviewProps> = ({
       {/* Weather & Forecast */}
       {weatherData && (
         <div className="bg-white rounded-lg shadow-sm p-6">
-          <h2 className="text-xl font-bold mb-4 text-gray-800">🌤️ Weather & Forecast</h2>
+          <h2 className="text-xl font-bold mb-4 text-gray-800">🌤️ Weather and Forecast</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {/* Current Weather */}
             <div className="p-4 bg-gradient-to-br from-sky-50 to-sky-100 rounded-lg border border-sky-200">
