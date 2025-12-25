@@ -141,7 +141,7 @@ const FarmerDashboard: React.FC = () => {
                   <p className="text-sm opacity-90">📍 Islamabad</p>
                   <h2 className="text-2xl font-bold mt-1">Today</h2>
                   <p className="text-sm opacity-90">27 Aug 2024</p>
-                  <button className="text-sm underline mt-2 opacity-90">See next forecast details</button>
+                  <button className="text-sm underline mt-2 opacity-90">See next forecast detail</button>
                 </div>
                 <div className="text-right">
                   <div className="flex items-center space-x-2">
@@ -157,7 +157,7 @@ const FarmerDashboard: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Land Overview */}
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold mb-4">Land Overview</h2>
+                <h2 className="text-xl font-semibold mb-4">Land Overviews</h2>
                 
                 <div className="flex justify-center mb-6">
                   <div className="relative w-48 h-48">
