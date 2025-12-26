@@ -52,7 +52,7 @@ const ApprovalsPage: React.FC<ApprovalsPageProps> = ({ onBack }) => {
           className="flex items-center space-x-2 text-cyan-400 hover:text-cyan-300 transition-colors"
         >
           <ArrowLeft className="w-5 h-5" />
-          <span className="font-medium">Back to Dashboard</span>
+          <span className="font-medium">Back to Dashboards</span>
         </button>
       </div>
 
