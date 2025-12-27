@@ -67,7 +67,7 @@ export const FieldCropManagement: React.FC<FieldCropManagementProps> = ({
                   <div className="font-bold">{field.name}</div>
                   <div className="text-gray-600">Crop: {field.crop}</div>
                   <div className="text-gray-600">Health: {field.health}%</div>
-                  <div className="text-gray-600">Soil Moisture: {field.soilMoisture}%</div>
+                  <div className="text-gray-600">Soil Moistures: {field.soilMoisture}%</div>
                   <div className="text-gray-500 text-xs mt-1">Last: {field.lastInspection}</div>
                 </div>
               </div>
