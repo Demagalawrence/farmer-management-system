@@ -65,7 +65,7 @@ const FinancialManagerDashboard: React.FC = () => {
     }
   };
 
-  // Financial metrics data
+  // Financial metric data
   const monthlyFinancials = [
     { month: 'Jan', revenue: 125000, expenses: 89000, profit: 36000, cashFlow: 42000 },
     { month: 'Feb', revenue: 142000, expenses: 95000, profit: 47000, cashFlow: 51000 },
@@ -111,7 +111,7 @@ const FinancialManagerDashboard: React.FC = () => {
                 <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
                   <span className="text-white font-bold text-sm">💰</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">FINANCIAL</span>
+                <span className="text-xl font-bold text-gray-900">FINANCIALS</span>
                 <span className="text-sm text-gray-500">MANAGEMENT</span>
               </div>
             </div>
