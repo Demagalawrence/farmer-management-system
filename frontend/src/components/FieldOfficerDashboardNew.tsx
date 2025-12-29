@@ -46,7 +46,7 @@ const FieldOfficerDashboard: React.FC = () => {
                 <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
                   <span className="text-white font-bold text-sm">🌾</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">FARMER MANAGEMENT</span>
+                <span className="text-xl font-bold text-gray-900">FARMER MANAGEMENT.</span>
                 <span className="text-sm text-gray-500">System</span>
               </div>
             </div>
@@ -73,7 +73,7 @@ const FieldOfficerDashboard: React.FC = () => {
             <nav className="space-y-2">
               <div className="flex items-center space-x-3 bg-green-100 text-green-700 px-3 py-2 rounded-lg">
                 <span className="text-sm">📊</span>
-                <span className="font-medium">Dashboard</span>
+                <span className="font-medium">Dashboards</span>
               </div>
               <div className="flex items-center space-x-3 text-gray-600 px-3 py-2 rounded-lg hover:bg-gray-50">
                 <span className="text-sm">🌱</span>
