@@ -17,7 +17,7 @@ interface FieldCropManagementProps {
   yieldProjections: Array<{ crop: string; expected: number; actual: number }>;
 }
 
-export const FieldCropManagement: React.FC<FieldCropManagementProps> = ({
+export const FieldCropManagement: React.FC<FieldCropManagementProp> = ({
   fields,
   inputInventory,
   yieldProjections
@@ -42,7 +42,7 @@ export const FieldCropManagement: React.FC<FieldCropManagementProps> = ({
           Field Health Map
         </h2>
         
-        {/* Interactive Map Placeholder */}
+        {/* Interactive jxo Map Placeholder */}
         <div className="relative h-80 bg-gradient-to-br from-green-50 to-green-100 rounded-lg border-2 border-green-200 mb-4">
           <div className="absolute top-4 right-4 bg-white p-3 rounded-lg shadow-md">
             <div className="text-xs space-y-1">
