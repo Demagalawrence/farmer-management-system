@@ -59,6 +59,7 @@ const DarkModeDashboard: React.FC = () => {
     { year: '2022-23', barley: 100, corn: 90, potato: 70 }
   ];
 
+
   // Logistics data
   const logisticsData = [
     { id: '038', shipmentId: '#260056', product: 'Barley', status: 'Arrived', statusColor: '#10B981' },
@@ -71,6 +72,7 @@ const DarkModeDashboard: React.FC = () => {
     setWallpaper(wallpaper);
     setShowWallpaperGallery(false);
   };
+
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
