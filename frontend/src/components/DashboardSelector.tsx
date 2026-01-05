@@ -7,6 +7,7 @@ import FinancialManagerDashboard from './FinancialManagerDashboardNew';
 import DarkModeDashboard from './DarkModeDashboard';
 import ComprehensiveFarmDashboard from './ComprehensiveFarmDashboard';
 
+
 const DashboardSelector: React.FC = () => {
   const { user, logout } = useAuth();
   const [selectedDashboard, setSelectedDashboard] = React.useState<string>('role-based');
@@ -20,6 +21,7 @@ const DashboardSelector: React.FC = () => {
         </div>
       </div>
     );
+
   }
 
   // Show dashboard selector
