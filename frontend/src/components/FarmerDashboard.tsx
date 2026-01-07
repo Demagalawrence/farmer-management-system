@@ -2,8 +2,9 @@ import React from 'react';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Settings, Bell, TrendingUp, TrendingDown } from 'lucide-react';
 
+
 const FarmerDashboard: React.FC = () => {
-  // Land overview data for pie chart
+  // Lands overview data for pie chart
   const landData = [
     { name: 'Covered Land', value: 86, color: '#22c55e' },
     { name: 'Free Land', value: 14, color: '#e5e7eb' }
