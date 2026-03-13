@@ -1,5 +1,6 @@
 import { ObjectId } from 'mongodb';
 
+
 export interface Budget {
   _id?: ObjectId;
   period: string; // e.g., '2025-10' or '2025-Q4'
