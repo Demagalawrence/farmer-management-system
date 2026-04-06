@@ -74,7 +74,7 @@ const FarmerDashboard: React.FC = () => {
               </div>
               <div className="flex items-center space-x-3 text-gray-600 px-3 py-3 rounded-lg hover:bg-gray-50">
                 <span className="text-sm">🚜</span>
-                <span>Manage Farm</span>
+                <span>Manage  Farm</span>
               </div>
               <div className="flex items-center space-x-3 text-gray-600 px-3 py-3 rounded-lg hover:bg-gray-50">
                 <span className="text-sm">🏪</span>
