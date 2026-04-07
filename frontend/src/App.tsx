@@ -23,7 +23,7 @@ function AppContent() {
 
   if (!user) return <AuthPage />;
 
-  // Lightweight routing: allow direct access to Finance page at /finance
+  // Lightweight routing: allow direct access to Finance page. at /finance
   const path = typeof window !== 'undefined' ? window.location.pathname : '';
   if (path === '/finance' && user?.role === 'finance') {
     return <FinancialManagerDashboard />;
