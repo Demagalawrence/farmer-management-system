@@ -13,6 +13,7 @@ export interface HarvestInput {
   field_id: ObjectId;
   farmer_id: ObjectId;
   harvest_date?: Date;
+
   quantity_tons: number;
   quality_grade?: 'A' | 'B' | 'C';
 }
