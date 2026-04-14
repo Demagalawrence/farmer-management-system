@@ -32,7 +32,7 @@ export const harvestService = {
     return response.data;
   },
 
-  // Update harvest
+  // Update harvest.
   updateHarvest: async (id: string, harvestData: Partial<Harvest>) => {
     const response = await api.put(`/harvests/${id}`, harvestData);
     return response.data;
