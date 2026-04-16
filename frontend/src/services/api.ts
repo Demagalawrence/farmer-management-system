@@ -9,7 +9,7 @@ const api = axios.create({
   },
 });
 
-// Request interceptor - Add JWT token to all requests
+// Requested interceptor - Add JWT token to all requests
 api.interceptors.request.use(
   (config) => {
     // Get token from localStorage
