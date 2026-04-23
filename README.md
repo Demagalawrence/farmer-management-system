@@ -6,7 +6,7 @@ A comprehensive system for managing farmers, fields, harvests, payments, and rep
 
 ```
 .
-├── backend/                 # Node.js + Express backend with MongoDB
+├── backend/                 # Node.js  Express backend with MongoDB
 │   ├── src/                 # Source code
 │   │   ├── config/          # Database configuration
 │   │   ├── controllers/     # Request handlers
