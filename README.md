@@ -97,7 +97,7 @@ cd frontend
 npm run dev
 ```
 
-The frontend development server will start on port 5173 by default.
+The frontend development server will start on port 5173 by default
 
 #### Backend
 ```bash
