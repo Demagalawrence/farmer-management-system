@@ -14,7 +14,7 @@ export const harvestService = {
     return response.data;
   },
 
-  // Get harvests by farmer ID
+  // Get harvest by farmer ID
   getHarvestsByFarmerId: async (farmerId: string) => {
     const response = await api.get(`/harvests/farmer/${farmerId}`);
     return response.data;
