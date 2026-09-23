@@ -9,13 +9,16 @@
     "dev": "nodemon src/server.ts",
     "test": "jest --coverage",
     "test:watch": "jest --watch",
-    "backup": "ts-node src/utils/backup.ts"
+    "backup": "ts-node src/utils/backup.ts",
+    "seed:codes": "ts-node src/scripts/initAccessCodes.ts"
   },
   "keywords": [],
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "@types/bcryptjs": "^2.4.6",
     "bcrypt": "^5.1.1",
+    "bcryptjs": "^3.0.3",
     "cors": "^2.8.5",
     "dotenv": "^17.2.3",
     "express": "^5.1.0",

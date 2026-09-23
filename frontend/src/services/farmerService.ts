@@ -8,7 +8,7 @@ export const farmerService = {
     return response.data;
   },
 
-  // Get farmer by ID
+  // Get farmers by ID
   getFarmerById: async (id: string) => {
     const response = await api.get(`/farmers/${id}`);
     return response.data;

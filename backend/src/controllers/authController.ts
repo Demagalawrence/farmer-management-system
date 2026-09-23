@@ -1,5 +1,6 @@
 import { Request, Response } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { getDb } from '../config/db';
 import { User } from '../models/User';
 import { generateToken } from '../middleware/auth';
@@ -51,19 +52,91 @@ export class AuthController {
   });
 
   register = asyncHandler(async (req: Request, res: Response): Promise<void> => {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, role, accessCode } = req.body;
 
     if (!name || !email || !password || !role) {
       throw new ValidationError('All fields are required');
     }
 
-    // Allow farmer role only if request is authenticated (from field officer)
-    const validRoles = ['field_officer', 'finance', 'manager', 'farmer'];
+    // Only allow privileged roles through public registration
+    // Farmers can only be registered by authenticated Field Officers
+    const validRoles = ['field_officer', 'finance', 'manager'];
+    if (role === 'farmer') {
+      throw new ValidationError('Farmer accounts can only be created by Field Officers. Please contact a Field Officer to register.');
+    }
+    
     if (!validRoles.includes(role)) {
       throw new ValidationError('Invalid role specified');
     }
 
     const db = getDb();
+
+    // Validate access code
+    if (!accessCode) {
+      throw new ValidationError('Access code is required for this role');
+    }
+
+    const adminSecret = process.env.ADMIN_SECRET || 'admin123';
+
+    // If accessCode equals the admin secret, allow for manager, finance, and field_officer
+    if (accessCode === adminSecret) {
+      if (!['manager', 'finance', 'field_officer'].includes(role)) {
+        throw new ValidationError('Invalid role specified for admin secret');
+      }
+      // Bypass dynamic access code checks
+    } else if (role === 'manager') {
+      // Manager must use the admin secret
+      throw new AuthenticationError('Invalid admin secret. Manager accounts require the admin secret to create.');
+    } else {
+      // For field_officer and finance, use dynamic access codes from database
+      const activeCode = await db.collection('access_codes').findOne({
+        code: accessCode,
+        role: role,
+        status: 'active'
+      });
+
+      if (!activeCode) {
+        throw new AuthenticationError('Invalid or expired access code. Please request a new code from your administrator.');
+      }
+
+      // Check if code has expired by time
+      if (new Date() > new Date(activeCode.expires_at)) {
+        await db.collection('access_codes').updateOne(
+          { _id: activeCode._id },
+          { $set: { status: 'expired' } }
+        );
+        throw new AuthenticationError('Access code has expired. Please request a new code from your administrator.');
+      }
+
+      // Mark code as used immediately (single-use code)
+      await db.collection('access_codes').updateOne(
+        { _id: activeCode._id },
+        { 
+          $set: { 
+            status: 'used',
+            used_at: new Date(),
+            used_by: email
+          } 
+        }
+      );
+
+      // Auto-generate a new code to replace the used one
+      const newCode = this.generateAccessCode();
+      const expiresAt = new Date();
+      expiresAt.setHours(expiresAt.getHours() + 24); // 24 hours expiry
+
+      await db.collection('access_codes').insertOne({
+        code: newCode,
+        role: role,
+        status: 'active',
+        created_at: new Date(),
+        expires_at: expiresAt,
+        created_by: 'system_auto',
+        used_count: 0
+      });
+
+      logger.info(`Auto-generated new ${role} access code: ${newCode} after use by ${email}`);
+    }
 
     // Check if user already exists
     const existingUser = await db.collection('users').findOne({ email });
@@ -86,6 +159,17 @@ export class AuthController {
 
     const result = await db.collection('users').insertOne(newUser);
 
+    // Create a single-use backup code for account recovery
+    const backupPlain = `${crypto.randomBytes(3).toString('hex').toUpperCase()}-${crypto.randomBytes(3).toString('hex').toUpperCase()}`;
+    const backupHash = await bcrypt.hash(backupPlain, 10);
+    await db.collection('backup_codes').insertOne({
+      user_id: result.insertedId,
+      email,
+      code_hash: backupHash,
+      used: false,
+      created_at: new Date(),
+    });
+
     // Generate JWT token for auto-login
     const token = generateToken({
       id: result.insertedId.toString(),
@@ -101,6 +185,55 @@ export class AuthController {
       message: 'User created successfully',
       token,
       userId: result.insertedId,
+      backup_code: backupPlain,
+    });
+  });
+
+  // Login using backup code (account recovery)
+  loginWithBackup = asyncHandler(async (req: Request, res: Response): Promise<void> => {
+    const { email, backupCode } = req.body as { email: string; backupCode: string };
+
+    if (!email || !backupCode) {
+      throw new ValidationError('Email and backup code are required');
+    }
+
+    const db = getDb();
+    const user = await db.collection('users').findOne({ email });
+    if (!user) {
+      throw new AuthenticationError('Invalid email or backup code');
+    }
+
+    // Find a not-yet-used backup code for this user/email
+    const record = await db.collection('backup_codes').findOne({ email, used: false });
+    if (!record) {
+      throw new AuthenticationError('Backup code not found or already used');
+    }
+
+    const ok = await bcrypt.compare(backupCode, record.code_hash);
+    if (!ok) {
+      throw new AuthenticationError('Invalid email or backup code');
+    }
+
+    // Mark as used and issue a fresh JWT
+    await db.collection('backup_codes').updateOne(
+      { _id: record._id },
+      { $set: { used: true, used_at: new Date() } }
+    );
+
+    const token = generateToken({
+      id: user._id.toString(),
+      email: user.email,
+      role: user.role,
+      name: user.name,
+    });
+
+    const { password_hash, ...userResponse } = user as any;
+
+    res.json({
+      success: true,
+      message: 'Logged in with backup code. Please change your password.',
+      token,
+      user: userResponse,
     });
   });
 
@@ -173,4 +306,14 @@ export class AuthController {
       message: 'Password changed successfully',
     });
   });
+
+  // Helper method to generate random access code
+  private generateAccessCode(): string {
+    const characters = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
+    let code = '';
+    for (let i = 0; i < 8; i++) {
+      code += characters.charAt(Math.floor(Math.random() * characters.length));
+    }
+    return code;
+  }
 }

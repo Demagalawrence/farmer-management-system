@@ -8,7 +8,8 @@ export const financeService = {
     return res.data;
   },
 
-  // Create a new manager approval request (finance role)
+  // Create a new manager approval
+ request (finance role)
   requestManagerApproval: async (payment_ids: string[], note?: string) => {
     const res = await api.post('/finance/approvals/request', { payment_ids, note });
     return res.data;

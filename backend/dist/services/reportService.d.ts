@@ -10,5 +10,15 @@ export declare class ReportService {
     findAll(): Promise<Report[]>;
     update(id: string | ObjectId, report: Partial<ReportInput>): Promise<Report | null>;
     delete(id: string | ObjectId): Promise<boolean>;
+    aggregatePayments(start: Date, end: Date, interval?: 'day' | 'month' | 'year'): Promise<{
+        period: string;
+        total: any;
+        count: any;
+    }[]>;
+    aggregateHarvests(start: Date, end: Date, interval?: 'day' | 'month' | 'year'): Promise<{
+        period: string;
+        total: any;
+        count: any;
+    }[]>;
 }
 //# sourceMappingURL=reportService.d.ts.map

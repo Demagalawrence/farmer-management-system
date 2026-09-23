@@ -62,6 +62,7 @@ CREATE TABLE Reports (
     created_at TIMESTAMP DEFAULT NOW()
 );
 
+
 -- Indexes for performance
 CREATE INDEX idx_fields_farmer_id ON Fields(farmer_id);
 CREATE INDEX idx_harvests_farmer_id ON Harvests(farmer_id);

@@ -14,7 +14,7 @@ export const harvestService = {
     return response.data;
   },
 
-  // Get harvests by farmer ID
+  // Get harvest by farmer ID
   getHarvestsByFarmerId: async (farmerId: string) => {
     const response = await api.get(`/harvests/farmer/${farmerId}`);
     return response.data;
@@ -32,7 +32,7 @@ export const harvestService = {
     return response.data;
   },
 
-  // Update harvest
+  // Update harvest.
   updateHarvest: async (id: string, harvestData: Partial<Harvest>) => {
     const response = await api.put(`/harvests/${id}`, harvestData);
     return response.data;

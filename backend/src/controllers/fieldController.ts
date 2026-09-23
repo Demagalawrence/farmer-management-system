@@ -15,6 +15,10 @@ export class FieldController {
   async createField(req: Request, res: Response): Promise<void> {
     try {
       const service = getFieldService();
+      // Normalize aliases from UI: allow crop_name as alias for crop_type
+      if (!req.body?.crop_type && req.body?.crop_name) {
+        req.body.crop_type = req.body.crop_name;
+      }
       const field = await service.create(req.body);
       res.status(201).json({ success: true, data: field });
     } catch (error: any) {

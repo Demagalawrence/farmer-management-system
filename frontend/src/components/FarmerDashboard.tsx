@@ -2,8 +2,9 @@ import React from 'react';
 import { PieChart, Pie, Cell, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import { Settings, Bell, TrendingUp, TrendingDown } from 'lucide-react';
 
+
 const FarmerDashboard: React.FC = () => {
-  // Land overview data for pie chart
+  // Lands overview data for pie chart
   const landData = [
     { name: 'Covered Land', value: 86, color: '#22c55e' },
     { name: 'Free Land', value: 14, color: '#e5e7eb' }
@@ -37,7 +38,7 @@ const FarmerDashboard: React.FC = () => {
                 <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
                   <span className="text-white font-bold text-sm">🌾</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
+                <span className="text-xl font-bold text-gray-900">FARMER MANAGEMENT</span>
                 <span className="text-sm text-gray-500">System</span>
               </div>
             </div>
@@ -73,7 +74,7 @@ const FarmerDashboard: React.FC = () => {
               </div>
               <div className="flex items-center space-x-3 text-gray-600 px-3 py-3 rounded-lg hover:bg-gray-50">
                 <span className="text-sm">🚜</span>
-                <span>Manage Farm</span>
+                <span>Manage  Farm</span>
               </div>
               <div className="flex items-center space-x-3 text-gray-600 px-3 py-3 rounded-lg hover:bg-gray-50">
                 <span className="text-sm">🏪</span>
@@ -141,7 +142,7 @@ const FarmerDashboard: React.FC = () => {
                   <p className="text-sm opacity-90">📍 Islamabad</p>
                   <h2 className="text-2xl font-bold mt-1">Today</h2>
                   <p className="text-sm opacity-90">27 Aug 2024</p>
-                  <button className="text-sm underline mt-2 opacity-90">See next forecast details</button>
+                  <button className="text-sm underline mt-2 opacity-90">See next forecast detail</button>
                 </div>
                 <div className="text-right">
                   <div className="flex items-center space-x-2">
@@ -157,7 +158,7 @@ const FarmerDashboard: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
               {/* Land Overview */}
               <div className="bg-white rounded-lg shadow-sm p-6">
-                <h2 className="text-xl font-semibold mb-4">Land Overview</h2>
+                <h2 className="text-xl font-semibold mb-4">Land Overviews</h2>
                 
                 <div className="flex justify-center mb-6">
                   <div className="relative w-48 h-48">

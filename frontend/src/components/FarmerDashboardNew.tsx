@@ -11,7 +11,7 @@ const FarmerDashboard: React.FC = () => {
   const [showWallpaperGallery, setShowWallpaperGallery] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
 
-  // Land overview data for pie chart
+  // Land overview data for pie charts
   const landData = [
     { name: 'Covered Land', value: 86, color: '#22c55e' },
     { name: 'Free Land', value: 14, color: '#e5e7eb' }
@@ -27,7 +27,7 @@ const FarmerDashboard: React.FC = () => {
     { month: 'JUN', profit: 48, cost: 40 }
   ];
 
-  // My crops data
+  // My crop data
   const myCropsData = [
     { name: 'Apple Gourd', status: 'Seed Started', progress: 8, healthColor: '#22c55e' },
     { name: 'Wheat', status: 'Ripening', progress: 32, healthColor: '#eab308' },
@@ -50,7 +50,7 @@ const FarmerDashboard: React.FC = () => {
                 <div className="w-8 h-8 bg-green-600 rounded flex items-center justify-center">
                   <span className="text-white font-bold text-sm">🌾</span>
                 </div>
-                <span className="text-xl font-bold text-gray-900">FARM MANAGEMENT</span>
+                <span className="text-xl font-bold text-gray-900">FARMER MANAGEMENT</span>
                 <span className="text-sm text-gray-500">System</span>
               </div>
             </div>

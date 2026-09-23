@@ -7,6 +7,7 @@ import FinancialManagerDashboard from './FinancialManagerDashboardNew';
 import DarkModeDashboard from './DarkModeDashboard';
 import ComprehensiveFarmDashboard from './ComprehensiveFarmDashboard';
 
+
 const DashboardSelector: React.FC = () => {
   const { user, logout } = useAuth();
   const [selectedDashboard, setSelectedDashboard] = React.useState<string>('role-based');
@@ -20,6 +21,7 @@ const DashboardSelector: React.FC = () => {
         </div>
       </div>
     );
+
   }
 
   // Show dashboard selector
@@ -59,7 +61,7 @@ const DashboardSelector: React.FC = () => {
                   <span className="text-2xl">🚜</span>
                 </div>
                 <h3 className="text-xl font-semibold mb-2">Comprehensive Farm</h3>
-                <p className="text-white/90 mb-4">Complete farm management with CCTV, weather, livestock</p>
+                <p className="text-white/90 mb-4">Complete farm management with CCTV, weather, livestock's</p>
                 <div className="bg-white/20 rounded-lg p-4 mb-4">
                   <div className="h-32 bg-gradient-to-br from-green-400 to-blue-500 rounded"></div>
                 </div>

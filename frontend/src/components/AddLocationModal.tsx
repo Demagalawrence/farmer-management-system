@@ -26,7 +26,7 @@ const AddLocationModal: React.FC<AddLocationModalProps> = ({ show, onClose, onSu
   useEffect(() => {
     if (!show || !mapContainerRef.current) return;
 
-    // Load Leaflet dynamically
+    // Load Leaflet dynamic
     const loadLeaflet = async () => {
       // Check if Leaflet is already loaded
       if ((window as any).L) {

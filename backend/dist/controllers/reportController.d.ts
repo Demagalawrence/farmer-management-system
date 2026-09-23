@@ -7,5 +7,7 @@ export declare class ReportController {
     getAllReports(req: Request, res: Response): Promise<void>;
     updateReport(req: Request, res: Response): Promise<void>;
     deleteReport(req: Request, res: Response): Promise<void>;
+    getPaymentChart(req: Request, res: Response): Promise<void>;
+    getHarvestChart(req: Request, res: Response): Promise<void>;
 }
 //# sourceMappingURL=reportController.d.ts.map

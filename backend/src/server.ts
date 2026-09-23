@@ -16,6 +16,7 @@ import paymentRoutes from './routes/paymentRoutes';
 import reportRoutes from './routes/reportRoutes';
 import searchRoutes from './routes/searchRoutes';
 import financeRoutes from './routes/financeRoutes';
+import accessCodeRoutes from './routes/accessCodeRoutes';
 
 // Load environment variables
 dotenv.config();
@@ -23,8 +24,13 @@ dotenv.config();
 const app: Application = express();
 const PORT = process.env.PORT || 5000;
 
-// Middleware
-app.use(cors());
+// Middleware - CORS configuration
+app.use(cors({
+  origin: ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002', 'http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176'],
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
 app.use(express.json());
 
 // Request logging middleware
@@ -60,6 +66,7 @@ app.use('/api/payments', paymentRoutes);
 app.use('/api/reports', reportRoutes);
 app.use('/api/search', searchRoutes);
 app.use('/api/finance', financeRoutes);
+app.use('/api/access-codes', accessCodeRoutes);
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

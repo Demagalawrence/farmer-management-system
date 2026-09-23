@@ -51,17 +51,29 @@ const createIndexes = async (database) => {
         await database.collection('users').createIndex({ role: 1 });
         await database.collection('farmers').createIndex({ user_id: 1 });
         await database.collection('farmers').createIndex({ status: 1 });
+        await database.collection('farmers').createIndex({ external_id: 1 }, { unique: true, sparse: true });
         await database.collection('fields').createIndex({ farmer_id: 1 });
         await database.collection('fields').createIndex({ health_status: 1 });
         await database.collection('fields').createIndex({ crop_stage: 1 });
+        await database.collection('fields').createIndex({ external_code: 1 }, { unique: true, sparse: true });
         await database.collection('harvests').createIndex({ farmer_id: 1 });
         await database.collection('harvests').createIndex({ field_id: 1 });
         await database.collection('harvests').createIndex({ harvest_date: 1 });
         await database.collection('payments').createIndex({ farmer_id: 1 });
         await database.collection('payments').createIndex({ status: 1 });
-        await database.collection('payments').createIndex({ harvest_id: 1 }, { unique: true });
+        try {
+            await database.collection('payments').dropIndex('harvest_id_1');
+        }
+        catch (e) {
+        }
+        await database.collection('payments').createIndex({ harvest_id: 1 }, {
+            name: 'harvest_id_1',
+            unique: true,
+            partialFilterExpression: { harvest_id: { $exists: true, $ne: null } },
+        });
         await database.collection('reports').createIndex({ type: 1 });
         await database.collection('reports').createIndex({ generated_by: 1 });
+        await database.collection('budgets').createIndex({ period: 1, category: 1 }, { unique: true });
     }
     catch (error) {
         console.error('Failed to create indexes:', error);

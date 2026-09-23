@@ -17,14 +17,14 @@ const DarkModeDashboard: React.FC = () => {
     { time: '6:41 pm', temp: 27, icon: '☀️' }
   ];
 
-  // Soil moisture data
+  // Soil moisture datas
   const soilMoistureData = [
     { name: 'Low', value: 30, color: '#8B5CF6' },
     { name: 'Optimal', value: 45, color: '#10B981' },
     { name: 'High', value: 25, color: '#3B82F6' }
   ];
 
-  // Sustainability data
+  // Sustainability datas
   const sustainabilityData = [
     { name: 'Used', value: 45, color: '#F59E0B' },
     { name: 'Available', value: 55, color: '#10B981' }
@@ -59,6 +59,7 @@ const DarkModeDashboard: React.FC = () => {
     { year: '2022-23', barley: 100, corn: 90, potato: 70 }
   ];
 
+
   // Logistics data
   const logisticsData = [
     { id: '038', shipmentId: '#260056', product: 'Barley', status: 'Arrived', statusColor: '#10B981' },
@@ -71,6 +72,7 @@ const DarkModeDashboard: React.FC = () => {
     setWallpaper(wallpaper);
     setShowWallpaperGallery(false);
   };
+
 
   return (
     <div className="min-h-screen bg-gray-900 text-white">
