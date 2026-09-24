@@ -1,5 +1,5 @@
 
-# Farmer Management System.
+# Farmer Management System
 
 [![CI](https://github.com/KubanjaElijahEldred/farmer-management-system/actions/workflows/ci.yml/badge.svg)](https://github.com/KubanjaElijahEldred/farmer-management-system/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
@@ -14,7 +14,6 @@ A comprehensive system for managing farmers, fields, harvests, payments, and rep
 
 ## Project Structure................................
 ............
-....
 
 ├── backend/                 # Node.js  Express backend with MongoDB
 │   ├── src/                 # Source code
